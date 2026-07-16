@@ -1,12 +1,16 @@
 @media (max-width: 1120px) {
   .feature-mini-grid,
   .safe-action-grid,
-  .compact-safe-grid {
+  .compact-safe-grid,
+  .her-day-suggestion-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
   .hero-inner,
   .safe-topics-layout,
+  .living-home-layout,
+  .living-detail-view,
+  .day-detail-layout,
   .day-head-product,
   .living-head-product {
     grid-template-columns: 1fr;
@@ -46,6 +50,8 @@
   .feature-mini-grid,
   .safe-action-grid,
   .compact-safe-grid,
+  .her-day-suggestion-grid,
+  .living-guide-grid,
   .mini-grid,
   .notes-grid,
   .note-form {
@@ -138,6 +144,42 @@
   .text-button {
     max-width: 100%;
   }
+
+  .day-detail-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .her-day-stop {
+    grid-template-columns: 62px minmax(0, 1fr);
+  }
+
+  .day-stop-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .replace-options {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .day-adjust-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .day-adjust-group.wide {
+    grid-column: auto;
+  }
+
+  .living-search-form > div {
+    grid-template-columns: 1fr;
+  }
+
+  .living-check-step {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 760px) {
@@ -224,5 +266,9 @@
   .map-place-popover {
     grid-template-columns: 74px minmax(0, 1fr) auto;
     max-width: calc(100% - 24px);
+  }
+
+  .places-empty-popover {
+    grid-template-columns: 1fr;
   }
 }

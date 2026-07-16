@@ -5,6 +5,9 @@ import {
   safetyGuides,
   savedDayPlans,
 } from './data.js';
+import { loadNotes, loadSavedDays, loadSavedGuides, loadSavedPlaces, mergeDayPlans } from './storage.js';
+
+const initialSavedPlaceIds = loadSavedPlaces() || favoritePlaceIds;
 
 export const state = {
   page: "home",
@@ -24,8 +27,11 @@ export const state = {
   selectedCaller: "mom",
   selectedTimer: "now",
   sosRevealed: false,
-  selectedLivingCategory: "Rent",
-  selectedGuide: "toilet",
+  selectedLivingCategory: "",
+  selectedGuide: "",
+  livingSearch: "",
+  livingStepProgress: {},
+  savedGuideIds: loadSavedGuides(),
   selectedPlaceCategory: "Cafe",
   selectedPlace: "mori-cafe",
   placeSearch: "",
@@ -34,14 +40,18 @@ export const state = {
   dayBudget: "3000 yen",
   dayArea: "Kichijoji",
   dayPlan: [],
+  selectedDaySuggestion: "",
+  dayPreference: "Calm and slow",
+  dayStartTime: "11:00",
+  dayAdjustOpen: false,
+  pendingDeleteDayId: "",
+  pendingRemoveGuideId: "",
+  pendingRemovePlaceId: "",
+  editingNoteId: "",
+  expandedNoteId: "",
+  pendingDeleteNoteId: "",
   myTab: "Places",
-  notes: [
-    {
-      id: "note-1",
-      title: "Move-in checklist",
-      text: "Check entrance lighting, spare key rules, and nearest convenience store before signing.",
-    },
-  ],
+  notes: loadNotes(),
   assistantOpen: false,
   assistantMessages: [
     {
@@ -54,9 +64,9 @@ export const state = {
     safetyGuides,
     livingGuides,
   },
-  favoritePlaces: places.filter((place) => favoritePlaceIds.includes(place.id)),
-  savedPlaces: [...favoritePlaceIds],
-  savedDays: savedDayPlans.map((plan) => ({ ...plan, stops: [...plan.stops] })),
+  favoritePlaces: places.filter((place) => initialSavedPlaceIds.includes(place.id)),
+  savedPlaces: [...initialSavedPlaceIds],
+  savedDays: mergeDayPlans(loadSavedDays(), savedDayPlans),
 };
 
 export const ASSET_ROOT = "images/";

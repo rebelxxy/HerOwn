@@ -128,11 +128,15 @@ function normalizeLivingGuide(guide) {
 }
 
 function normalizeDayPlan(plan) {
+  const preference = plan.preference || String(plan.notes || '').match(/^Preference:\s*(.+)$/)?.[1] || '';
   return {
     id: String(plan.id),
     title: plan.title,
     mood: plan.mood || '',
     area: plan.area || '',
+    duration: plan.duration || '',
+    budget: plan.budget || (plan.budget_yen ? `${plan.budget_yen} yen` : ''),
+    preference,
     stops: (plan.stops || []).map((stop) => {
       const time = String(stop.start_time || '').slice(0, 5);
       const title = stop.title || stop.place_name || stop.category || 'Stop';

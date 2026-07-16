@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import { renderStaticText } from './i18n.js';
-import { moods } from './data.js';
 import { saveDayPlan, saveFavoritePlace } from './api.js';
+import { hasSavedDayPlan, mergeDayPlans, persistNotes, persistSavedDays, persistSavedGuides, persistSavedPlaces } from './storage.js';
 import { renderAssistant } from './components/assistant.js';
 import { renderHome } from './pages/home.js';
 import { renderSafe } from './pages/safe.js';
@@ -9,9 +9,10 @@ import { renderFakeCall, startFakeCall, answerFakeCall, closeCallOverlay } from 
 import { renderSOS } from './pages/sos.js';
 import { renderLiving } from './pages/living.js';
 import { renderPlaces } from './pages/places.js';
-import { renderDay, buildDayStops, getDayPlan, nextPlanTime } from './pages/day.js';
+import { createAdditionalDayStop, createCurrentDayPlan, createDayPlanApiPayload, generateAdjustedDayPlan, getDayPlan, getDaySuggestion, normalizeSuggestionPlan, reflowDayPlan, renderDay } from './pages/day.js';
 import { renderMy } from './pages/my.js';
 import { pageShell } from './components/layout.js';
+import { daySuggestions } from './data.js';
 
 const app = document.querySelector('#app');
 const navLinks = [...document.querySelectorAll('.nav-link[data-page], .icon-button[data-page]')];
@@ -219,6 +220,32 @@ function showToast(message) {
   window.setTimeout(() => toast.remove(), 2200);
 }
 
+function savedPlanToStops(plan) {
+  if (Array.isArray(plan.stopDetails) && plan.stopDetails.length) {
+    return plan.stopDetails.map((stop) => ({
+      time: stop.time || String(stop.start_time || "").slice(0, 5) || "11:00",
+      title: stop.title || "Stop",
+      type: stop.type || stop.category || "Place",
+      area: stop.area || plan.area || state.dayArea,
+      description: stop.description || stop.note || "Saved HER Day stop.",
+      placeId: stop.placeId || stop.place_id || "",
+    }));
+  }
+
+  return (plan.stops || []).map((stopText) => {
+    const [time = "11:00", ...titleParts] = String(stopText).split(" ");
+    const title = titleParts.join(" ") || "Stop";
+    return {
+      time,
+      title,
+      type: title,
+      area: plan.area || state.dayArea,
+      description: "Saved HER Day stop.",
+      placeId: "",
+    };
+  });
+}
+
 function bindPageEvents() {
   app.querySelectorAll("[data-page]").forEach((button) => {
     button.addEventListener("click", () => navigate(button.dataset.page));
@@ -252,7 +279,14 @@ function bindPageEvents() {
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       const formData = new FormData(form);
-      state.placeSearch = formData.get("placeSearch") || "";
+      state.placeSearch = String(formData.get("placeSearch") || "").trim();
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-clear-place-search]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.placeSearch = "";
       render();
     });
   });
@@ -260,6 +294,106 @@ function bindPageEvents() {
   app.querySelectorAll("[data-my-tab]").forEach((button) => {
     button.addEventListener("click", () => {
       state.myTab = button.dataset.myTab;
+      state.pendingDeleteDayId = "";
+      state.pendingRemoveGuideId = "";
+      state.pendingRemovePlaceId = "";
+      state.pendingDeleteNoteId = "";
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-open-saved-place]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const place = state.catalogs.places.find((item) => item.id === button.dataset.openSavedPlace);
+      if (!place) return;
+      state.selectedPlace = place.id;
+      state.selectedPlaceCategory = place.category;
+      navigate("places");
+    });
+  });
+
+  app.querySelectorAll("[data-remove-saved-place]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const placeId = button.dataset.removeSavedPlace;
+      state.savedPlaces = persistSavedPlaces(state.savedPlaces.filter((id) => id !== placeId));
+      state.favoritePlaces = state.favoritePlaces.filter((place) => place.id !== placeId);
+      showToast("Removed");
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-open-saved-guide]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedGuide = button.dataset.openSavedGuide;
+      state.pendingRemoveGuideId = "";
+      navigate("living");
+    });
+  });
+
+  app.querySelectorAll("[data-request-remove-guide]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.pendingRemoveGuideId = button.dataset.requestRemoveGuide;
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-cancel-remove-guide]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.pendingRemoveGuideId = "";
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-confirm-remove-guide]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const guideId = button.dataset.confirmRemoveGuide;
+      state.savedGuideIds = persistSavedGuides(state.savedGuideIds.filter((id) => id !== guideId));
+      state.pendingRemoveGuideId = "";
+      showToast("Removed");
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-open-day-plan]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const plan = state.savedDays.find((day) => day.id === button.dataset.openDayPlan);
+      if (!plan) return;
+
+      const sourceSuggestion = daySuggestions.find((suggestion) => suggestion.id === plan.sourceSuggestionId || suggestion.title === plan.title) || getDaySuggestion();
+      state.selectedDaySuggestion = sourceSuggestion.id;
+      state.dayMood = plan.mood || sourceSuggestion.mood;
+      state.dayTime = plan.duration || sourceSuggestion.duration;
+      state.dayBudget = plan.budget || sourceSuggestion.budget;
+      state.dayArea = plan.area || sourceSuggestion.area;
+      state.dayPreference = plan.preference || state.dayPreference;
+      state.dayPlan = savedPlanToStops(plan);
+      state.dayStartTime = state.dayPlan[0]?.time || state.dayStartTime;
+      state.dayAdjustOpen = false;
+      state.pendingDeleteDayId = "";
+      navigate("day");
+    });
+  });
+
+  app.querySelectorAll("[data-request-delete-day]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.pendingDeleteDayId = button.dataset.requestDeleteDay;
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-cancel-delete-day]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.pendingDeleteDayId = "";
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-confirm-delete-day]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const dayId = button.dataset.confirmDeleteDay;
+      state.savedDays = persistSavedDays(state.savedDays.filter((day) => day.id !== dayId));
+      state.pendingDeleteDayId = "";
+      showToast("Day plan deleted");
       render();
     });
   });
@@ -268,12 +402,88 @@ function bindPageEvents() {
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       const formData = new FormData(form);
-      state.notes.unshift({
-        id: `note-${Date.now()}`,
-        title: formData.get("noteTitle"),
-        text: formData.get("noteText"),
-      });
-      showToast("Note added");
+      const title = String(formData.get("noteTitle") || "").trim();
+      const content = String(formData.get("noteContent") || "").trim();
+      if (!title && !content) {
+        showToast("Write a title or note first");
+        return;
+      }
+
+      const now = new Date().toISOString();
+      if (state.editingNoteId) {
+        state.notes = persistNotes(state.notes.map((note) => (
+          note.id === state.editingNoteId
+            ? {
+              ...note,
+              title: title || "Untitled note",
+              content,
+              updatedAt: now,
+            }
+            : note
+        )));
+        state.editingNoteId = "";
+        showToast("Note updated");
+      } else {
+        state.notes = persistNotes([
+          {
+            id: `note-${Date.now()}`,
+            title: title || "Untitled note",
+            content,
+            createdAt: now,
+            updatedAt: now,
+          },
+          ...state.notes,
+        ]);
+        showToast("Note added");
+      }
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-edit-note]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.editingNoteId = button.dataset.editNote;
+      state.pendingDeleteNoteId = "";
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-cancel-edit-note]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.editingNoteId = "";
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-request-delete-note]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.pendingDeleteNoteId = button.dataset.requestDeleteNote;
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-cancel-delete-note]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.pendingDeleteNoteId = "";
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-confirm-delete-note]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const noteId = button.dataset.confirmDeleteNote;
+      state.notes = persistNotes(state.notes.filter((note) => note.id !== noteId));
+      if (state.editingNoteId === noteId) state.editingNoteId = "";
+      if (state.expandedNoteId === noteId) state.expandedNoteId = "";
+      state.pendingDeleteNoteId = "";
+      showToast("Note deleted");
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-toggle-note]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.expandedNoteId = state.expandedNoteId === button.dataset.toggleNote ? "" : button.dataset.toggleNote;
       render();
     });
   });
@@ -324,12 +534,9 @@ function bindPageEvents() {
 
   app.querySelectorAll("[data-living-category]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.selectedLivingCategory = button.dataset.livingCategory;
-      const livingGuides = state.catalogs.livingGuides;
-      const next = livingGuides.find((guide) => guide.category === state.selectedLivingCategory);
-      if (next) {
-        state.selectedGuide = next.id;
-      }
+      state.selectedLivingCategory = state.selectedLivingCategory === button.dataset.livingCategory ? "" : button.dataset.livingCategory;
+      state.livingSearch = "";
+      state.selectedGuide = "";
       render();
     });
   });
@@ -337,6 +544,63 @@ function bindPageEvents() {
   app.querySelectorAll("[data-guide]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedGuide = button.dataset.guide;
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-living-search-form]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const formData = new FormData(form);
+      state.livingSearch = String(formData.get("livingSearch") || "").trim();
+      state.selectedLivingCategory = "";
+      state.selectedGuide = "";
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-clear-living-filters]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.livingSearch = "";
+      state.selectedLivingCategory = "";
+      state.selectedGuide = "";
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-living-back]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedGuide = "";
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-save-guide]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const guideId = button.dataset.saveGuide;
+      if (!state.savedGuideIds.includes(guideId)) {
+        state.savedGuideIds = persistSavedGuides([...state.savedGuideIds, guideId]);
+      }
+      showToast("Guide saved");
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-living-step]").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      const guideId = state.selectedGuide;
+      if (!guideId) return;
+      const stepIndex = Number(checkbox.dataset.livingStep);
+      const current = new Set(state.livingStepProgress[guideId] || []);
+      if (checkbox.checked) {
+        current.add(stepIndex);
+      } else {
+        current.delete(stepIndex);
+      }
+      state.livingStepProgress = {
+        ...state.livingStepProgress,
+        [guideId]: [...current].sort((a, b) => a - b),
+      };
       render();
     });
   });
@@ -365,6 +629,7 @@ function bindPageEvents() {
       const id = button.dataset.savePlace;
       if (!state.savedPlaces.includes(id)) {
         state.savedPlaces.push(id);
+        state.savedPlaces = persistSavedPlaces(state.savedPlaces);
         const place = state.catalogs.places.find((item) => item.id === id);
         if (place && !state.favoritePlaces.some((item) => item.id === id)) {
           state.favoritePlaces.push(place);
@@ -372,7 +637,7 @@ function bindPageEvents() {
         void saveFavoritePlace(state.user.id, id);
         showToast("Saved to My Places");
       } else {
-        state.savedPlaces = state.savedPlaces.filter((placeId) => placeId !== id);
+        state.savedPlaces = persistSavedPlaces(state.savedPlaces.filter((placeId) => placeId !== id));
         state.favoritePlaces = state.favoritePlaces.filter((place) => place.id !== id);
         showToast("Removed from My Places");
       }
@@ -380,113 +645,179 @@ function bindPageEvents() {
     });
   });
 
-  app.querySelectorAll("[data-day-mood]").forEach((button) => {
+  app.querySelectorAll("[data-day-suggestion]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.dayMood = button.dataset.dayMood;
+      const suggestion = getDaySuggestion(button.dataset.daySuggestion);
+      state.selectedDaySuggestion = suggestion.id;
+      state.dayMood = suggestion.mood;
+      state.dayTime = suggestion.duration;
+      state.dayBudget = suggestion.budget;
+      state.dayArea = suggestion.area;
+      state.dayStartTime = suggestion.stops[0]?.time || state.dayStartTime;
+      state.dayAdjustOpen = false;
+      state.dayPlan = normalizeSuggestionPlan(suggestion);
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-create-my-day]").forEach((button) => {
+    button.addEventListener("click", () => {
+      showToast("Coming Soon");
+    });
+  });
+
+  app.querySelectorAll("[data-day-back]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedDaySuggestion = "";
+      state.dayAdjustOpen = false;
       state.dayPlan = [];
       render();
     });
   });
 
-  app.querySelectorAll("[data-day-time]").forEach((button) => {
+  app.querySelectorAll("[data-toggle-day-adjust]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.dayTime = button.dataset.dayTime;
-      state.dayPlan = [];
+      state.dayAdjustOpen = !state.dayAdjustOpen;
       render();
     });
   });
 
-  app.querySelectorAll("[data-day-budget]").forEach((button) => {
+  app.querySelectorAll("[data-adjust-day-time]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.dayBudget = button.dataset.dayBudget;
-      state.dayPlan = [];
+      state.dayTime = button.dataset.adjustDayTime;
       render();
     });
   });
 
-  app.querySelectorAll("[data-day-area]").forEach((button) => {
+  app.querySelectorAll("[data-adjust-day-budget]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.dayArea = button.dataset.dayArea;
-      state.dayPlan = [];
+      state.dayBudget = button.dataset.adjustDayBudget;
       render();
     });
   });
 
-  app.querySelectorAll("[data-shuffle-day]").forEach((button) => {
+  app.querySelectorAll("[data-adjust-day-area]").forEach((button) => {
     button.addEventListener("click", () => {
-      const currentIndex = moods.indexOf(state.dayMood);
-      state.dayMood = moods[(currentIndex + 1) % moods.length];
-      state.dayPlan = [];
-      showToast(`Shuffled to ${state.dayMood}`);
+      state.dayArea = button.dataset.adjustDayArea;
       render();
     });
   });
 
-  app.querySelectorAll("[data-add-stop]").forEach((button) => {
+  app.querySelectorAll("[data-adjust-day-preference]").forEach((button) => {
     button.addEventListener("click", () => {
-      const recommendation = buildDayStops()[Number(button.dataset.addStop)];
-      state.dayPlan.push({ ...recommendation, time: nextPlanTime(state.dayPlan.length) });
-      showToast(`${recommendation.type} added to My Plan`);
+      state.dayPreference = button.dataset.adjustDayPreference;
       render();
     });
   });
 
-  app.querySelectorAll("[data-clear-day]").forEach((button) => {
+  app.querySelectorAll("[data-day-start-time]").forEach((input) => {
+    input.addEventListener("input", () => {
+      state.dayStartTime = input.value || state.dayStartTime;
+    });
+    input.addEventListener("change", () => {
+      state.dayStartTime = input.value || state.dayStartTime;
+    });
+  });
+
+  app.querySelectorAll("[data-apply-day-adjust]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.dayPlan = [];
-      showToast("Plan cleared");
+      const startInput = app.querySelector("[data-day-start-time]");
+      if (startInput?.value) state.dayStartTime = startInput.value;
+      state.dayPlan = generateAdjustedDayPlan();
+      state.dayAdjustOpen = false;
+      showToast("Day adjusted");
       render();
     });
   });
 
-  app.querySelectorAll("[data-save-day]").forEach((button) => {
+  app.querySelectorAll("[data-save-day-suggestion]").forEach((button) => {
     button.addEventListener("click", () => {
-      const planStops = getDayPlan();
-      const localPlan = {
-        id: `day-${Date.now()}`,
-        title: `${state.dayMood} in ${state.dayArea}`,
-        mood: state.dayMood,
-        area: state.dayArea,
-        stops: planStops.map((stop) => `${stop.time} ${stop.type}`),
-      };
-      state.savedDays.unshift(localPlan);
-      void saveDayPlan(state.user.id, {
-        title: localPlan.title,
-        mood: state.dayMood,
-        duration: state.dayTime,
-        budget_yen: Number.parseInt(state.dayBudget, 10),
-        area: state.dayArea,
-        stops: planStops.map((stop, index) => ({
-          stop_order: index + 1,
-          start_time: `${stop.time}:00`,
-          title: stop.type,
-          category: stop.type,
-          area: stop.area,
-        })),
-      });
-      showToast("Saved to My HER Day");
+      const suggestion = getDaySuggestion(button.dataset.saveDaySuggestion);
+      const localPlan = createCurrentDayPlan(suggestion);
+      if (hasSavedDayPlan(state.savedDays, localPlan)) {
+        showToast("Saved to My Days");
+        render();
+        return;
+      }
+
+      state.savedDays = persistSavedDays(mergeDayPlans([localPlan], state.savedDays));
+      void saveDayPlan(state.user.id, createDayPlanApiPayload(localPlan));
+      showToast("Saved to My Days");
       render();
     });
   });
 
-  app.querySelectorAll("[data-remove-stop]").forEach((button) => {
+  app.querySelectorAll("[data-start-route]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.dayPlan = getDayPlan().filter((_, index) => index !== Number(button.dataset.removeStop));
-      showToast("Removed from My Plan");
-      render();
+      showToast("Route feature coming soon.");
     });
   });
 
-  app.querySelectorAll("[data-move-stop]").forEach((button) => {
+  app.querySelectorAll("[data-replace-stop]").forEach((button) => {
     button.addEventListener("click", () => {
-      const index = Number(button.dataset.moveStop);
+      const index = Number(button.dataset.replaceStop);
+      const place = state.catalogs.places.find((item) => item.id === button.dataset.replacePlace);
+      const plan = [...getDayPlan()];
+      if (place && plan[index]) {
+        plan[index] = {
+          ...plan[index],
+          title: place.name,
+          type: place.category,
+          area: place.area,
+          description: place.reason,
+          placeId: place.id,
+          budget: place.budget,
+          distance: place.distance,
+        };
+        state.dayPlan = reflowDayPlan(plan);
+        showToast("Stop replaced");
+        render();
+      }
+    });
+  });
+
+  app.querySelectorAll("[data-day-move-up]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number(button.dataset.dayMoveUp);
       const plan = [...getDayPlan()];
       if (index > 0) {
         [plan[index - 1], plan[index]] = [plan[index], plan[index - 1]];
-        state.dayPlan = plan;
+        state.dayPlan = reflowDayPlan(plan);
         showToast("Moved up");
         render();
       }
+    });
+  });
+
+  app.querySelectorAll("[data-day-move-down]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number(button.dataset.dayMoveDown);
+      const plan = [...getDayPlan()];
+      if (index < plan.length - 1) {
+        [plan[index], plan[index + 1]] = [plan[index + 1], plan[index]];
+        state.dayPlan = reflowDayPlan(plan);
+        showToast("Moved down");
+        render();
+      }
+    });
+  });
+
+  app.querySelectorAll("[data-day-remove-stop]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number(button.dataset.dayRemoveStop);
+      const plan = getDayPlan().filter((_, stopIndex) => stopIndex !== index);
+      state.dayPlan = reflowDayPlan(plan);
+      showToast("Stop removed");
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-add-day-stop]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const plan = [...getDayPlan(), createAdditionalDayStop()];
+      state.dayPlan = reflowDayPlan(plan);
+      showToast("Stop added");
+      render();
     });
   });
 
