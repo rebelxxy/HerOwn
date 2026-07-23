@@ -265,6 +265,35 @@ export function createCurrentDayPlan(suggestion = getDaySuggestion()) {
   });
 }
 
+export function createDraftDayPlan() {
+  const planStops = getDayPlan();
+  const stopDetails = planStops.map((stop, index) => ({
+    stop_order: index + 1,
+    time: stop.time,
+    title: stop.title,
+    type: stop.type,
+    category: stop.type,
+    area: stop.area,
+    placeId: stop.placeId || "",
+    description: stop.description || "",
+  }));
+
+  return ensureDayPlanIdentity({
+    title: state.currentDayDraft?.title || "My HER Day",
+    sourceSuggestionId: "current-draft",
+    mood: state.dayMood,
+    area: state.currentDayDraft?.area || state.dayArea,
+    duration: state.currentDayDraft?.duration || state.dayTime,
+    budget: state.currentDayDraft?.budget || state.dayBudget,
+    preference: state.currentDayDraft?.preference || state.dayPreference,
+    startTime: state.currentDayDraft?.startTime || state.dayStartTime,
+    includes: [...new Set(planStops.map((stop) => stop.type))],
+    stops: planStops.map((stop) => `${stop.time} ${stop.title}`),
+    stopDetails,
+    savedAt: new Date().toISOString(),
+  });
+}
+
 export function createDayPlanApiPayload(plan) {
   const stopDetails = Array.isArray(plan.stopDetails) ? plan.stopDetails : [];
   return {
@@ -473,6 +502,92 @@ function renderSuggestionDetail(suggestion) {
   `;
 }
 
+function renderCurrentDraft() {
+  const draft = state.currentDayDraft;
+  if (!draft) return "";
+
+  const plan = getDayPlan();
+  const includedTypes = [...new Set(plan.map((stop) => stop.type))];
+  const routeText = `Route placeholder: ${plan.map((stop) => stop.title).join(" → ")}.`;
+
+  return `
+    <section class="day-detail-layout current-day-draft">
+      <div class="surface">
+        <div class="detail-heading">
+          <p class="eyebrow">Current Day Draft</p>
+          <h2>${draft.title || "My HER Day"}</h2>
+          <p class="section-copy">Places you added from HER Places are kept here until you save them to My Days.</p>
+          <div class="suggestion-meta">
+            <span class="pill">${displayDuration(state.dayTime)}</span>
+            <span class="pill">${state.dayBudget}</span>
+            <span class="pill">${state.dayArea}</span>
+            <span class="pill">${state.dayPreference}</span>
+            ${includedTypes.map((type) => `<span class="tag">${type}</span>`).join("")}
+          </div>
+        </div>
+
+        <div class="section-head places-subhead">
+          <div>
+            <p class="eyebrow">Current stops</p>
+            <h3>${plan.length} stops in your draft.</h3>
+          </div>
+        </div>
+
+        <div class="timeline">
+          ${plan
+            .map(
+              (stop, index) => `
+                <article class="timeline-card her-day-stop">
+                  <time>${stop.time}</time>
+                  <div>
+                    <strong>${stop.title}</strong>
+                    <span>${stop.type} · ${stop.area}</span>
+                    <p>${stop.description}</p>
+                  </div>
+                  ${renderStopActions(stop, index, plan.length)}
+                </article>
+              `
+            )
+            .join("")}
+        </div>
+
+        <div class="day-stop-footer">
+          <button class="soft-button" type="button" data-add-day-stop>Add a stop</button>
+        </div>
+
+        ${renderAdjustPanel()}
+
+        <div class="day-detail-actions">
+          <button class="button" type="button" data-start-route="current-draft">Start Route</button>
+          <button class="soft-button" type="button" data-save-current-day-draft>Save to My Days</button>
+          <button class="text-button" type="button" data-toggle-day-adjust>Adjust this Day</button>
+          <button class="text-button" type="button" data-request-discard-day-draft>Discard Draft</button>
+        </div>
+        ${
+          state.pendingDiscardDayDraft
+            ? `
+              <div class="delete-confirm">
+                <span>Discard this HER Day draft?</span>
+                <button class="soft-button" type="button" data-confirm-discard-day-draft>Confirm</button>
+                <button class="text-button" type="button" data-cancel-discard-day-draft>Cancel</button>
+              </div>
+            `
+            : ""
+        }
+      </div>
+
+      <aside class="surface route-placeholder">
+        <p class="eyebrow">Route placeholder</p>
+        <h3>Map route will live here.</h3>
+        <p>${routeText}</p>
+        <div class="route-line" aria-hidden="true">
+          ${plan.map((stop) => `<span>${stop.time}</span>`).join("")}
+        </div>
+      </aside>
+    </section>
+  `;
+}
+
 export function renderDay() {
   const selectedSuggestion = state.selectedDaySuggestion ? getDaySuggestion() : null;
 
@@ -485,6 +600,6 @@ export function renderDay() {
       </div>
       <img src="${PICTURE_ROOT}003_large_woman_writing_flowers.png" alt="" />
     </div>
-    ${selectedSuggestion ? renderSuggestionDetail(selectedSuggestion) : renderSuggestionList()}
+    ${state.currentDayDraft ? renderCurrentDraft() : selectedSuggestion ? renderSuggestionDetail(selectedSuggestion) : renderSuggestionList()}
   `);
 }

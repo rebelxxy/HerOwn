@@ -1,5 +1,6 @@
-export function pageShell(content) {
-  return `<section class="page section">${content}</section>`;
+export function pageShell(content, className = "") {
+  const extraClass = className ? ` ${className}` : "";
+  return `<section class="page section${extraClass}">${content}</section>`;
 }
 
 export function sectionHead(eyebrow, title, copy, action = "") {

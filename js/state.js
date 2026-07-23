@@ -5,9 +5,10 @@ import {
   safetyGuides,
   savedDayPlans,
 } from './data.js';
-import { loadNotes, loadSavedDays, loadSavedGuides, loadSavedPlaces, mergeDayPlans } from './storage.js';
+import { loadCurrentDayDraft, loadNotes, loadSavedDays, loadSavedGuides, loadSavedPlaces, mergeDayPlans } from './storage.js';
 
 const initialSavedPlaceIds = loadSavedPlaces() || favoritePlaceIds;
+const currentDayDraft = loadCurrentDayDraft();
 
 export const state = {
   page: "home",
@@ -23,7 +24,7 @@ export const state = {
     locationEnabled: true,
   },
   authMode: "register",
-  selectedSafe: "train",
+  selectedSafe: "",
   selectedCaller: "mom",
   selectedTimer: "now",
   sosRevealed: false,
@@ -32,18 +33,21 @@ export const state = {
   livingSearch: "",
   livingStepProgress: {},
   savedGuideIds: loadSavedGuides(),
-  selectedPlaceCategory: "Cafe",
+  selectedPlaceCategory: "All",
+  selectedPlaceExperiences: [],
   selectedPlace: "mori-cafe",
   placeSearch: "",
   dayMood: "Peace",
-  dayTime: "Half day",
-  dayBudget: "3000 yen",
-  dayArea: "Kichijoji",
-  dayPlan: [],
+  dayTime: currentDayDraft?.duration || "Half day",
+  dayBudget: currentDayDraft?.budget || "3000 yen",
+  dayArea: currentDayDraft?.area || "Kichijoji",
+  dayPlan: currentDayDraft?.stops || [],
   selectedDaySuggestion: "",
-  dayPreference: "Calm and slow",
-  dayStartTime: "11:00",
+  dayPreference: currentDayDraft?.preference || "Calm and slow",
+  dayStartTime: currentDayDraft?.startTime || "11:00",
   dayAdjustOpen: false,
+  currentDayDraft,
+  pendingDiscardDayDraft: false,
   pendingDeleteDayId: "",
   pendingRemoveGuideId: "",
   pendingRemovePlaceId: "",

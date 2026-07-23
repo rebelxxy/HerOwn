@@ -1,4 +1,5 @@
 export const SAVED_DAYS_KEY = "herOwnSavedDays";
+export const CURRENT_DAY_DRAFT_KEY = "herOwnCurrentDayDraft";
 export const SAVED_GUIDES_KEY = "herOwnSavedGuides";
 export const SAVED_PLACES_KEY = "herOwnSavedPlaces";
 export const NOTES_KEY = "herOwnNotes";
@@ -97,6 +98,92 @@ export function persistSavedDays(plans) {
   }
 
   return normalized;
+}
+
+function normalizeDraftStop(stop) {
+  if (typeof stop === "string") {
+    const [time = "11:00", ...titleParts] = stop.trim().split(" ");
+    return {
+      time,
+      title: titleParts.join(" ") || "Stop",
+      type: "Place",
+      area: "",
+      description: "",
+      placeId: "",
+      budget: "",
+      distance: "",
+    };
+  }
+
+  return {
+    time: stop.time || String(stop.start_time || "").slice(0, 5) || "11:00",
+    title: stop.title || stop.place_name || stop.name || "Stop",
+    type: stop.type || stop.category || "Place",
+    area: stop.area || "",
+    description: stop.description || stop.note || stop.reason || "",
+    placeId: stop.placeId || stop.place_id || stop.id || "",
+    budget: stop.budget || "",
+    distance: stop.distance || "",
+  };
+}
+
+function normalizeCurrentDayDraft(draft) {
+  if (!draft || typeof draft !== "object") return null;
+  const stops = Array.isArray(draft.stops) ? draft.stops.map(normalizeDraftStop) : [];
+  if (!stops.length) return null;
+  const now = new Date().toISOString();
+
+  return {
+    id: String(draft.id || "current-day-draft"),
+    title: String(draft.title || "My HER Day"),
+    area: String(draft.area || stops[0]?.area || ""),
+    duration: String(draft.duration || "Half day"),
+    budget: String(draft.budget || "3000 yen"),
+    startTime: String(draft.startTime || stops[0]?.time || "11:00"),
+    preference: String(draft.preference || "Calm and slow"),
+    stops,
+    updatedAt: draft.updatedAt || now,
+  };
+}
+
+export function loadCurrentDayDraft() {
+  const storage = safeLocalStorage();
+  if (!storage) return null;
+
+  try {
+    return normalizeCurrentDayDraft(JSON.parse(storage.getItem(CURRENT_DAY_DRAFT_KEY) || "null"));
+  } catch (error) {
+    console.warn("Could not read current HER Day draft from localStorage.");
+    return null;
+  }
+}
+
+export function persistCurrentDayDraft(draft) {
+  const storage = safeLocalStorage();
+  const normalized = normalizeCurrentDayDraft({
+    ...draft,
+    updatedAt: new Date().toISOString(),
+  });
+  if (!storage || !normalized) return normalized;
+
+  try {
+    storage.setItem(CURRENT_DAY_DRAFT_KEY, JSON.stringify(normalized));
+  } catch (error) {
+    console.warn("Could not save current HER Day draft to localStorage.");
+  }
+
+  return normalized;
+}
+
+export function clearCurrentDayDraft() {
+  const storage = safeLocalStorage();
+  if (!storage) return;
+
+  try {
+    storage.removeItem(CURRENT_DAY_DRAFT_KEY);
+  } catch (error) {
+    console.warn("Could not clear current HER Day draft from localStorage.");
+  }
 }
 
 export function hasSavedDayPlan(plans, plan) {

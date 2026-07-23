@@ -8,7 +8,7 @@ import {
 } from './api.js';
 import { initRouter } from './router.js';
 import { state } from './state.js';
-import { loadSavedDays, loadSavedPlaces, mergeDayPlans } from './storage.js';
+import { loadCurrentDayDraft, loadSavedDays, loadSavedPlaces, mergeDayPlans } from './storage.js';
 
 async function hydrateApiData() {
   const [places, safetyGuides, livingGuides, favorites, dayPlans] = await Promise.all([
@@ -33,6 +33,17 @@ async function hydrateApiData() {
     ));
   state.savedPlaces = state.favoritePlaces.map((place) => place.id);
   state.savedDays = mergeDayPlans(loadSavedDays(), state.savedDays, dayPlans);
+
+  const currentDraft = loadCurrentDayDraft();
+  if (currentDraft) {
+    state.currentDayDraft = currentDraft;
+    state.dayPlan = currentDraft.stops;
+    state.dayArea = currentDraft.area || state.dayArea;
+    state.dayTime = currentDraft.duration || state.dayTime;
+    state.dayBudget = currentDraft.budget || state.dayBudget;
+    state.dayStartTime = currentDraft.startTime || state.dayStartTime;
+    state.dayPreference = currentDraft.preference || state.dayPreference;
+  }
 
   document.dispatchEvent(new CustomEvent('herown:data-ready'));
 }

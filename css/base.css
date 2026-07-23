@@ -166,21 +166,6 @@ main {
   padding-top: var(--nav-height);
 }
 
-.page {
-  animation: pageIn 360ms ease both;
-}
-
-@keyframes pageIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .hero {
   position: relative;
   min-height: calc(100vh - var(--nav-height));

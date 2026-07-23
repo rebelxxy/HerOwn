@@ -1,7 +1,7 @@
 import { state } from './state.js';
-import { renderStaticText } from './i18n.js';
+import { renderStaticText, t } from './i18n.js';
 import { saveDayPlan, saveFavoritePlace } from './api.js';
-import { hasSavedDayPlan, mergeDayPlans, persistNotes, persistSavedDays, persistSavedGuides, persistSavedPlaces } from './storage.js';
+import { clearCurrentDayDraft, hasSavedDayPlan, mergeDayPlans, persistCurrentDayDraft, persistNotes, persistSavedDays, persistSavedGuides, persistSavedPlaces } from './storage.js';
 import { renderAssistant } from './components/assistant.js';
 import { renderHome } from './pages/home.js';
 import { renderSafe } from './pages/safe.js';
@@ -9,7 +9,7 @@ import { renderFakeCall, startFakeCall, answerFakeCall, closeCallOverlay } from 
 import { renderSOS } from './pages/sos.js';
 import { renderLiving } from './pages/living.js';
 import { renderPlaces } from './pages/places.js';
-import { createAdditionalDayStop, createCurrentDayPlan, createDayPlanApiPayload, generateAdjustedDayPlan, getDayPlan, getDaySuggestion, normalizeSuggestionPlan, reflowDayPlan, renderDay } from './pages/day.js';
+import { createAdditionalDayStop, createCurrentDayPlan, createDayPlanApiPayload, createDraftDayPlan, generateAdjustedDayPlan, getDayPlan, getDaySuggestion, normalizeSuggestionPlan, reflowDayPlan, renderDay } from './pages/day.js';
 import { renderMy } from './pages/my.js';
 import { pageShell } from './components/layout.js';
 import { daySuggestions } from './data.js';
@@ -21,6 +21,7 @@ const menuButton = document.querySelector('.mobile-menu');
 const phoneOverlay = document.querySelector('#phoneOverlay');
 const answerCall = document.querySelector('#answerCall');
 const declineCall = document.querySelector('#declineCall');
+let renderedPage = "";
 
 function navigate(page) {
   state.page = page;
@@ -39,6 +40,106 @@ function setActiveNav() {
   });
 }
 
+function cssEscape(value) {
+  if (window.CSS?.escape) return window.CSS.escape(value);
+  return String(value).replace(/["\\]/g, "\\$&");
+}
+
+function htmlEscape(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function focusSnapshot() {
+  const active = document.activeElement;
+  if (!active || !app.contains(active)) return null;
+  if (active.id) return `#${cssEscape(active.id)}`;
+
+  const dataAttribute = Object.keys(active.dataset || {})[0];
+  if (dataAttribute) {
+    const attrName = dataAttribute.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+    return `[data-${attrName}="${cssEscape(active.dataset[dataAttribute])}"]`;
+  }
+
+  if (active.name) return `${active.tagName.toLowerCase()}[name="${cssEscape(active.name)}"]`;
+  return null;
+}
+
+function restoreViewport(scrollX, scrollY, focusSelector) {
+  requestAnimationFrame(() => {
+    const root = document.documentElement;
+    const previousScrollBehavior = root.style.scrollBehavior;
+    root.style.scrollBehavior = "auto";
+    window.scrollTo(scrollX, scrollY);
+    root.style.scrollBehavior = previousScrollBehavior;
+    if (!focusSelector) return;
+    app.querySelector(focusSelector)?.focus({ preventScroll: true });
+  });
+}
+
+function syncAttributes(current, next) {
+  [...current.attributes].forEach((attribute) => {
+    if (!next.hasAttribute(attribute.name)) current.removeAttribute(attribute.name);
+  });
+  [...next.attributes].forEach((attribute) => {
+    if (current.getAttribute(attribute.name) !== attribute.value) {
+      current.setAttribute(attribute.name, attribute.value);
+    }
+  });
+}
+
+function shouldReplaceNode(current, next) {
+  if (current.nodeType !== next.nodeType) return true;
+  if (current.nodeType !== Node.ELEMENT_NODE) return false;
+  if (current.tagName !== next.tagName) return true;
+  return current.matches("button,input,textarea,select,option,form,summary");
+}
+
+function morphNode(current, next) {
+  if (shouldReplaceNode(current, next)) {
+    current.replaceWith(next.cloneNode(true));
+    return;
+  }
+
+  if (current.nodeType === Node.TEXT_NODE) {
+    if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
+    return;
+  }
+
+  if (current.nodeType !== Node.ELEMENT_NODE) return;
+  syncAttributes(current, next);
+  morphChildren(current, next);
+}
+
+function morphChildren(currentParent, nextParent) {
+  let current = currentParent.firstChild;
+  let next = nextParent.firstChild;
+
+  while (next) {
+    const followingCurrent = current?.nextSibling || null;
+    const followingNext = next.nextSibling;
+
+    if (!current) {
+      currentParent.appendChild(next.cloneNode(true));
+    } else {
+      morphNode(current, next);
+    }
+
+    current = followingCurrent;
+    next = followingNext;
+  }
+
+  while (current) {
+    const followingCurrent = current.nextSibling;
+    current.remove();
+    current = followingCurrent;
+  }
+}
+
 function render() {
   renderStaticText();
   setActiveNav();
@@ -54,9 +155,41 @@ function render() {
     day: renderDay,
     my: renderMy,
   };
-  app.innerHTML = routes[state.page]();
+  const nextHtml = routes[state.page]();
+  const samePage = renderedPage === state.page && app.childNodes.length > 0;
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+  const focused = focusSnapshot();
+
+  if (samePage) {
+    const template = document.createElement("template");
+    template.innerHTML = nextHtml;
+    morphChildren(app, template.content);
+  } else {
+    app.innerHTML = nextHtml;
+    renderedPage = state.page;
+  }
+
   bindPageEvents();
   renderAssistant();
+
+  if (samePage) {
+    restoreViewport(scrollX, scrollY, focused);
+  }
+}
+
+function renderPreservingScroll(focusMatch = null) {
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+  render();
+  requestAnimationFrame(() => {
+    const button = focusMatch
+      ? [...app.querySelectorAll(focusMatch.selector)]
+        .find((item) => item.dataset[focusMatch.datasetKey] === focusMatch.value)
+      : null;
+    restoreViewport(scrollX, scrollY, "");
+    button?.focus({ preventScroll: true });
+  });
 }
 
 function renderAuth() {
@@ -211,13 +344,158 @@ function copyOrToast(text) {
   }
 }
 
-function showToast(message) {
+function showToast(message, actions = []) {
   document.querySelectorAll(".toast").forEach((toast) => toast.remove());
   const toast = document.createElement("div");
-  toast.className = "toast";
-  toast.textContent = message;
+  toast.className = actions.length ? "toast toast-with-actions" : "toast";
+  const text = document.createElement("span");
+  text.textContent = message;
+  toast.appendChild(text);
+
+  actions.forEach((action) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = action.label;
+    button.addEventListener("click", () => {
+      toast.remove();
+      action.onClick?.();
+    });
+    toast.appendChild(button);
+  });
+
   document.body.appendChild(toast);
-  window.setTimeout(() => toast.remove(), 2200);
+  window.setTimeout(() => toast.remove(), actions.length ? 5200 : 2200);
+}
+
+function closeSafeModal() {
+  const modal = document.querySelector(".safe-display-modal");
+  if (!modal) return;
+  const restoreSelector = modal.dataset.restoreFocus;
+  modal.remove();
+  if (restoreSelector) document.querySelector(restoreSelector)?.focus({ preventScroll: true });
+}
+
+function openSafeModal(text, title = "") {
+  closeSafeModal();
+  const active = document.activeElement;
+  let restoreSelector = "";
+  if (active?.id) {
+    restoreSelector = `#${cssEscape(active.id)}`;
+  } else if (active?.dataset) {
+    const key = Object.keys(active.dataset)[0];
+    if (key) {
+      const attrName = key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+      restoreSelector = `[data-${attrName}]`;
+    }
+  }
+  const modal = document.createElement("div");
+  modal.className = "safe-display-modal";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.dataset.restoreFocus = restoreSelector;
+  modal.innerHTML = `
+    <div class="safe-display-card">
+      ${title ? `<p class="eyebrow">${htmlEscape(title)}</p>` : ""}
+      <div class="safe-display-text">${String(text).split("\n").map((line) => `<span>${htmlEscape(line)}</span>`).join("")}</div>
+      <button class="button" type="button" data-safe-modal-close>${t("safeClose")}</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelector("[data-safe-modal-close]")?.focus({ preventScroll: true });
+}
+
+function copySafeText(text) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(
+      () => showToast(t("safeCopied")),
+      () => copySafeTextFallback(text)
+    );
+  } else {
+    copySafeTextFallback(text);
+  }
+}
+
+function copySafeTextFallback(text) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand("copy");
+    showToast(t("safeCopied"));
+  } catch (error) {
+    showToast(text);
+  }
+  textarea.remove();
+}
+
+function preferredFemaleVoice(lang = "ja-JP") {
+  const voices = window.speechSynthesis.getVoices();
+  const langPrefix = lang.toLowerCase().split("-")[0];
+  const matchingLang = voices.filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix));
+  const femaleHints = ["female", "woman", "kyoko", "sayaka", "nanami", "haruka", "yuna", "samantha", "victoria", "allison", "ava", "susan", "zira", "karen", "moira", "tessa"];
+  const maleHints = ["male", "man", "otoya", "ichiro", "alex", "fred", "daniel", "thomas", "jorge", "diego"];
+
+  const hasHint = (voice, hints) => {
+    const label = `${voice.name} ${voice.voiceURI} ${voice.gender || ""}`.toLowerCase();
+    return hints.some((hint) => label.includes(hint));
+  };
+
+  return (
+    matchingLang.find((voice) => hasHint(voice, femaleHints)) ||
+    matchingLang.find((voice) => !hasHint(voice, maleHints)) ||
+    voices.find((voice) => hasHint(voice, femaleHints)) ||
+    null
+  );
+}
+
+function speakSafePhrase(text, button, previousText) {
+  const utterance = new SpeechSynthesisUtterance(text);
+  const voice = preferredFemaleVoice("ja-JP");
+  utterance.lang = "ja-JP";
+  utterance.pitch = 1.12;
+  utterance.rate = 0.9;
+  if (voice) utterance.voice = voice;
+  utterance.onend = () => {
+    button.textContent = previousText;
+    button.disabled = false;
+  };
+  utterance.onerror = () => {
+    button.textContent = previousText;
+    button.disabled = false;
+    showToast(t("safeSpeechUnsupported"));
+  };
+  window.speechSynthesis.speak(utterance);
+}
+
+function playSafePhrase(text, button) {
+  if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
+    showToast(t("safeSpeechUnsupported"));
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+  const previousText = button.textContent;
+  button.textContent = t("safePlaying");
+  button.disabled = true;
+
+  if (!window.speechSynthesis.getVoices().length) {
+    let hasSpoken = false;
+    const speakWhenReady = () => {
+      if (hasSpoken) return;
+      hasSpoken = true;
+      window.speechSynthesis.onvoiceschanged = null;
+      speakSafePhrase(text, button, previousText);
+    };
+    window.speechSynthesis.onvoiceschanged = speakWhenReady;
+    setTimeout(speakWhenReady, 300);
+    return;
+  }
+
+  speakSafePhrase(text, button, previousText);
 }
 
 function savedPlanToStops(plan) {
@@ -244,6 +522,55 @@ function savedPlanToStops(plan) {
       placeId: "",
     };
   });
+}
+
+function placeToDayStop(place) {
+  const recommended = Array.isArray(place.whyRecommended)
+    ? place.whyRecommended[0]
+    : place.whyRecommended;
+
+  return {
+    time: state.dayStartTime || "11:00",
+    title: place.name,
+    type: place.category,
+    area: place.area,
+    description: recommended || place.description || place.reason || "Added from HER Places.",
+    placeId: place.id,
+    budget: place.priceRange || place.budget || "",
+    distance: place.distance || "",
+  };
+}
+
+function persistDraftFromState(overrides = {}) {
+  const stops = reflowDayPlan(state.dayPlan || []);
+  state.dayPlan = stops;
+  const draft = persistCurrentDayDraft({
+    id: state.currentDayDraft?.id || "current-day-draft",
+    title: state.currentDayDraft?.title || "My HER Day",
+    area: state.dayArea,
+    duration: state.dayTime,
+    budget: state.dayBudget,
+    startTime: state.dayStartTime,
+    preference: state.dayPreference,
+    stops,
+    ...overrides,
+  });
+  state.currentDayDraft = draft;
+  return draft;
+}
+
+function syncCurrentDraftIfNeeded() {
+  if (!state.currentDayDraft) return null;
+  return persistDraftFromState();
+}
+
+function clearCurrentDraftState() {
+  clearCurrentDayDraft();
+  state.currentDayDraft = null;
+  state.dayPlan = [];
+  state.selectedDaySuggestion = "";
+  state.dayAdjustOpen = false;
+  state.pendingDiscardDayDraft = false;
 }
 
 function bindPageEvents() {
@@ -280,6 +607,8 @@ function bindPageEvents() {
       event.preventDefault();
       const formData = new FormData(form);
       state.placeSearch = String(formData.get("placeSearch") || "").trim();
+      state.selectedPlaceCategory = "All";
+      state.selectedPlaceExperiences = [];
       render();
     });
   });
@@ -308,6 +637,8 @@ function bindPageEvents() {
       if (!place) return;
       state.selectedPlace = place.id;
       state.selectedPlaceCategory = place.category;
+      state.selectedPlaceExperiences = [];
+      state.placeSearch = "";
       navigate("places");
     });
   });
@@ -491,7 +822,70 @@ function bindPageEvents() {
   app.querySelectorAll("[data-safe]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedSafe = button.dataset.safe;
-      render();
+      renderPreservingScroll({
+        selector: "[data-safe]",
+        datasetKey: "safe",
+        value: button.dataset.safe,
+      });
+    });
+  });
+
+  app.querySelectorAll("[data-safe-home]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedSafe = "";
+      renderPreservingScroll();
+    });
+  });
+
+  app.querySelectorAll("[data-safe-action-page]").forEach((button) => {
+    button.addEventListener("click", () => {
+      navigate(button.dataset.safeActionPage);
+    });
+  });
+
+  app.querySelectorAll("[data-safe-action-tip]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (button.dataset.safeNumber) return;
+      showToast(button.dataset.safeActionTip);
+    });
+  });
+
+  app.querySelectorAll("[data-safe-number]").forEach((button) => {
+    button.addEventListener("click", () => {
+      openSafeModal(button.dataset.safeNumber, button.dataset.safeActionTip || "");
+    });
+  });
+
+  app.querySelectorAll("[data-safe-scroll-communication]").forEach((button) => {
+    button.addEventListener("click", () => {
+      app.querySelector("#safeCommunication")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  });
+
+  app.querySelectorAll("[data-safe-phrase-show]").forEach((button) => {
+    button.addEventListener("click", () => {
+      openSafeModal(button.dataset.safePhraseShow, t("safeCommunication"));
+    });
+  });
+
+  app.querySelectorAll("[data-safe-phrase-play]").forEach((button) => {
+    button.addEventListener("click", () => {
+      playSafePhrase(button.dataset.safePhrasePlay, button);
+    });
+  });
+
+  app.querySelectorAll("[data-safe-phrase-copy]").forEach((button) => {
+    button.addEventListener("click", () => {
+      copySafeText(button.dataset.safePhraseCopy);
+    });
+  });
+
+  app.querySelectorAll("[data-safe-why-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const panel = app.querySelector(`#${button.getAttribute("aria-controls")}`);
+      const expanded = button.getAttribute("aria-expanded") === "true";
+      button.setAttribute("aria-expanded", String(!expanded));
+      if (panel) panel.hidden = expanded;
     });
   });
 
@@ -608,8 +1002,17 @@ function bindPageEvents() {
   app.querySelectorAll("[data-place-category]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedPlaceCategory = button.dataset.placeCategory;
+      state.placeSearch = "";
       const places = state.catalogs.places;
-      const matching = places.find((place) => place.category === state.selectedPlaceCategory);
+      const activeExperiences = Array.isArray(state.selectedPlaceExperiences) ? state.selectedPlaceExperiences : [];
+      const matching = places.find((place) => {
+        const matchesCategory = state.selectedPlaceCategory === "All" || place.category === state.selectedPlaceCategory;
+        const tags = [...(place.experienceTags || []), ...(place.practicalTags || [])];
+        const matchesExperiences = activeExperiences.every((filter) => tags.includes(filter));
+        return matchesCategory && matchesExperiences;
+      }) || places.find((place) => (
+        state.selectedPlaceCategory === "All" || place.category === state.selectedPlaceCategory
+      ));
       if (matching) {
         state.selectedPlace = matching.id;
       }
@@ -617,10 +1020,41 @@ function bindPageEvents() {
     });
   });
 
+  app.querySelectorAll("[data-place-experience]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const filter = button.dataset.placeExperience;
+      const current = Array.isArray(state.selectedPlaceExperiences) ? state.selectedPlaceExperiences : [];
+      state.placeSearch = "";
+      state.selectedPlaceExperiences = current.includes(filter)
+        ? current.filter((item) => item !== filter)
+        : [...current, filter];
+      renderPreservingScroll({
+        selector: "[data-place-experience]",
+        datasetKey: "placeExperience",
+        value: filter,
+      });
+    });
+  });
+
+  app.querySelectorAll("[data-clear-place-filters]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedPlaceCategory = "All";
+      state.selectedPlaceExperiences = [];
+      state.placeSearch = "";
+      renderPreservingScroll();
+    });
+  });
+
   app.querySelectorAll("[data-place]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedPlace = button.dataset.place;
       render();
+    });
+  });
+
+  app.querySelectorAll("[data-place-back]").forEach((button) => {
+    button.addEventListener("click", () => {
+      app.querySelector(".places-list-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
 
@@ -636,11 +1070,30 @@ function bindPageEvents() {
         }
         void saveFavoritePlace(state.user.id, id);
         showToast("Saved to My Places");
-      } else {
-        state.savedPlaces = persistSavedPlaces(state.savedPlaces.filter((placeId) => placeId !== id));
-        state.favoritePlaces = state.favoritePlaces.filter((place) => place.id !== id);
-        showToast("Removed from My Places");
       }
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-add-place-day]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const place = state.catalogs.places.find((item) => item.id === button.dataset.addPlaceDay);
+      if (!place) return;
+      const currentPlan = state.currentDayDraft?.stops || [];
+      const alreadyAdded = currentPlan.some((stop) => stop.placeId === place.id);
+      if (!alreadyAdded) {
+        state.dayArea = state.currentDayDraft?.area || place.area || state.dayArea;
+        state.dayPlan = reflowDayPlan([...currentPlan, placeToDayStop(place)]);
+        persistDraftFromState({
+          title: state.currentDayDraft?.title || "My HER Day",
+          area: state.dayArea,
+        });
+      }
+      state.selectedDaySuggestion = "";
+      showToast("Added to your current HER Day", [
+        { label: "View HER Day", onClick: () => navigate("day") },
+        { label: "Keep browsing" },
+      ]);
       render();
     });
   });
@@ -725,6 +1178,7 @@ function bindPageEvents() {
       if (startInput?.value) state.dayStartTime = startInput.value;
       state.dayPlan = generateAdjustedDayPlan();
       state.dayAdjustOpen = false;
+      syncCurrentDraftIfNeeded();
       showToast("Day adjusted");
       render();
     });
@@ -743,6 +1197,41 @@ function bindPageEvents() {
       state.savedDays = persistSavedDays(mergeDayPlans([localPlan], state.savedDays));
       void saveDayPlan(state.user.id, createDayPlanApiPayload(localPlan));
       showToast("Saved to My Days");
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-save-current-day-draft]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const localPlan = createDraftDayPlan();
+      if (!hasSavedDayPlan(state.savedDays, localPlan)) {
+        state.savedDays = persistSavedDays(mergeDayPlans([localPlan], state.savedDays));
+        void saveDayPlan(state.user.id, createDayPlanApiPayload(localPlan));
+      }
+      clearCurrentDraftState();
+      showToast("Saved to My Days");
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-request-discard-day-draft]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.pendingDiscardDayDraft = true;
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-cancel-discard-day-draft]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.pendingDiscardDayDraft = false;
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-confirm-discard-day-draft]").forEach((button) => {
+    button.addEventListener("click", () => {
+      clearCurrentDraftState();
+      showToast("Draft discarded");
       render();
     });
   });
@@ -770,6 +1259,7 @@ function bindPageEvents() {
           distance: place.distance,
         };
         state.dayPlan = reflowDayPlan(plan);
+        syncCurrentDraftIfNeeded();
         showToast("Stop replaced");
         render();
       }
@@ -783,6 +1273,7 @@ function bindPageEvents() {
       if (index > 0) {
         [plan[index - 1], plan[index]] = [plan[index], plan[index - 1]];
         state.dayPlan = reflowDayPlan(plan);
+        syncCurrentDraftIfNeeded();
         showToast("Moved up");
         render();
       }
@@ -796,6 +1287,7 @@ function bindPageEvents() {
       if (index < plan.length - 1) {
         [plan[index], plan[index + 1]] = [plan[index + 1], plan[index]];
         state.dayPlan = reflowDayPlan(plan);
+        syncCurrentDraftIfNeeded();
         showToast("Moved down");
         render();
       }
@@ -807,6 +1299,7 @@ function bindPageEvents() {
       const index = Number(button.dataset.dayRemoveStop);
       const plan = getDayPlan().filter((_, stopIndex) => stopIndex !== index);
       state.dayPlan = reflowDayPlan(plan);
+      syncCurrentDraftIfNeeded();
       showToast("Stop removed");
       render();
     });
@@ -816,6 +1309,7 @@ function bindPageEvents() {
     button.addEventListener("click", () => {
       const plan = [...getDayPlan(), createAdditionalDayStop()];
       state.dayPlan = reflowDayPlan(plan);
+      syncCurrentDraftIfNeeded();
       showToast("Stop added");
       render();
     });
@@ -838,6 +1332,15 @@ export function initRouter() {
   document.addEventListener('click', (event) => {
     const pageButton = event.target.closest('[data-page]');
     if (pageButton && !app.contains(pageButton)) navigate(pageButton.dataset.page);
+    if (event.target.closest('[data-safe-modal-close]') || event.target.classList?.contains("safe-display-modal")) {
+      closeSafeModal();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === "Escape") {
+      closeSafeModal();
+    }
   });
 
   menuButton.addEventListener('click', () => mainNav.classList.toggle('is-open'));

@@ -1,8 +1,10 @@
 @media (max-width: 1120px) {
   .feature-mini-grid,
   .safe-action-grid,
+  .safe-action-v1-grid,
   .compact-safe-grid,
-  .her-day-suggestion-grid {
+  .her-day-suggestion-grid,
+  .safe-scenario-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -259,6 +261,83 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .places-filter-head,
+  .places-detail-head {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .places-filter-head .text-button {
+    width: max-content;
+  }
+
+  .places-experience-list,
+  .places-mvp .filter-list.horizontal {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .places-experience-list .filter-chip,
+  .places-mvp .filter-chip {
+    white-space: nowrap;
+  }
+
+  .places-mvp-layout,
+  .places-detail-grid,
+  .safe-action-v1-grid,
+  .safe-why-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .safe-scenario-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .safe-scenario-detail-head,
+  .safe-phrase-card {
+    grid-template-columns: 1fr;
+  }
+
+  .safe-phrase-actions {
+    justify-content: flex-start;
+  }
+
+  .safe-phrase-actions .soft-button,
+  .safe-phrase-actions .text-button {
+    width: auto;
+  }
+
+  .places-card-list {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .places-mvp-card {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  .places-mvp-card .card-arrow {
+    display: none;
+  }
+
+  .places-detail-head img {
+    max-width: 190px;
+  }
+
+  .places-detail-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .toast-with-actions {
+    align-items: stretch;
+    flex-direction: column;
+    border-radius: 16px;
+    width: calc(100vw - 36px);
+  }
+
   .product-map {
     overflow: hidden;
   }
@@ -270,5 +349,96 @@
 
   .places-empty-popover {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1120px) {
+  .safe-v1-hero {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    min-height: 0;
+  }
+
+  .safe-v1-copy {
+    max-width: 620px;
+  }
+
+  .safe-hero-visual {
+    min-height: clamp(300px, 52vw, 480px);
+  }
+}
+
+@media (max-width: 760px) {
+  .safe-v1-page {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+  }
+
+  .safe-v1-hero {
+    gap: 16px;
+    margin: -18px 0 18px;
+    padding-top: 0;
+  }
+
+  .safe-v1-copy {
+    gap: 14px;
+    padding-left: 0;
+  }
+
+  .safe-v1-brand {
+    font-size: clamp(39px, 11vw, 52px);
+    letter-spacing: 0;
+  }
+
+  .safe-v1-rule {
+    width: 44px;
+  }
+
+  .safe-v1-copy h1 {
+    font-size: clamp(28px, 9vw, 38px);
+  }
+
+  .safe-v1-copy p:last-child {
+    margin-top: 2px;
+    font-size: clamp(19px, 6vw, 24px);
+  }
+
+  .safe-hero-visual {
+    min-height: 250px;
+    border-radius: 18px;
+  }
+
+  .safe-hero-visual::after {
+    inset: 8px;
+    border-radius: 16px;
+  }
+
+  .safe-hero-visual img {
+    object-position: 58% center;
+    transform: scale(1.01);
+  }
+
+  .safe-scenario-card {
+    min-height: 108px;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .safe-scenario-icon {
+    width: 58px;
+    height: 58px;
+  }
+
+  .safe-scenario-icon svg {
+    width: 34px;
+    height: 34px;
+  }
+
+  .safe-scenario-card strong {
+    font-size: 16px;
+  }
+
+  .safe-scenario-arrow {
+    font-size: 34px;
   }
 }
