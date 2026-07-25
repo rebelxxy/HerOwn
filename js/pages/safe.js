@@ -1,6 +1,7 @@
 import { state, ASSET_ROOT } from '../state.js';
 import { t } from '../i18n.js';
 import { pageShell } from '../components/layout.js';
+import { buildGoogleMapsSearchUrl } from '../utils/maps.js';
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -37,10 +38,10 @@ const safeScenarios = [
     },
     actions: [
       {
-        label: { en: "Safe Route", ja: "明るい道へ", zh: "安全路线" },
-        copy: { en: "Find a brighter, busier route.", ja: "明るく人のいる道を選びます。", zh: "选择更明亮、人更多的路线。" },
-        behavior: "tip",
-        tip: { en: "Safe Route MVP: choose a brighter, busier route and avoid going straight home.", ja: "明るく人の多い道へ移動し、心配な時はそのまま帰宅しないでください。", zh: "请往明亮、人多的路线移动，感到不安时不要直接回家。" },
+        labelKey: "mapsOpenMaps",
+        copyKey: "safeMapSupportingCopy",
+        behavior: "maps",
+        mapQuery: { en: "Tokyo station convenience store police box", ja: "東京 駅 コンビニ 交番", zh: "东京 车站 便利店 派出所" },
       },
       {
         label: { en: "Fake Call", ja: "フェイクコール", zh: "假电话" },
@@ -98,7 +99,7 @@ const safeScenarios = [
       zh: "你可以改变路线或方式。一步一步来。",
     },
     actions: [
-      { label: { en: "Safe Route", ja: "明るい道へ", zh: "安全路线" }, copy: { en: "Choose a brighter and busier way home.", ja: "明るく人のいる帰り道を選びます。", zh: "选择更明亮、人更多的回家路。" }, behavior: "tip", tip: { en: "Use bright streets, station exits, convenience stores, and roads with people nearby.", ja: "明るい通り、駅、コンビニ、人通りのある道を選んでください。", zh: "选择明亮街道、车站出口、便利店和有人经过的路。" } },
+      { labelKey: "mapsOpenMaps", copyKey: "safeMapSupportingCopy", behavior: "maps", mapQuery: { en: "Tokyo station convenience store police box", ja: "東京 駅 コンビニ 交番", zh: "东京 车站 便利店 派出所" } },
       { label: { en: "Find a public place", ja: "人のいる場所へ", zh: "去公共场所" }, copy: { en: "Go to a convenience store, station, or open shop.", ja: "コンビニ、駅、開いている店へ向かいます。", zh: "去便利店、车站或营业中的店。" }, behavior: "tip", tip: { en: "Wait in a staffed or bright place before deciding your next step.", ja: "次の行動を決める前に、明るくスタッフのいる場所で待ってください。", zh: "先在明亮、有工作人员的地方等一下再决定下一步。" } },
       { label: { en: "Take a taxi", ja: "タクシーにする", zh: "改坐出租车" }, copy: { en: "Choose another way home if walking feels unsafe.", ja: "歩くのが不安なら別の帰り方にします。", zh: "如果走路不安心，换一种回家方式。" }, behavior: "tip", tip: { en: "Choose a staffed taxi stand or a trusted taxi app. Share your location if you can.", ja: "タクシー乗り場や信頼できるアプリを使い、可能なら位置情報を共有してください。", zh: "使用正规出租车点或可信打车软件，可以的话分享位置。" } },
       { label: { en: "Communication", ja: "伝える", zh: "沟通" }, copy: { en: "Show or play helpful phrases.", ja: "必要な言葉を見せたり再生します。", zh: "展示或播放可用短句。" }, behavior: "communication" },
@@ -212,6 +213,11 @@ function scenarioById(id = state.selectedSafe) {
   return safeScenarios.find((scenario) => scenario.id === id) || null;
 }
 
+function actionText(action, field) {
+  const key = action[`${field}Key`];
+  return key ? t(key) : localize(action[field]);
+}
+
 function safeIconSvg(id) {
   const icons = {
     followed: `
@@ -259,6 +265,16 @@ function safeIconSvg(id) {
 }
 
 function renderAction(action, scenario) {
+  if (action.behavior === "maps") {
+    const url = buildGoogleMapsSearchUrl({ query: localize(action.mapQuery) });
+    return `
+      <a class="surface safe-action-v1-card safe-map-action ${scenario.emergency ? "is-emergency-soft" : ""}" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${t("mapsOpenMaps")}. ${t("mapsOpensExternal")}`)}">
+        <strong>${escapeHtml(actionText(action, "label"))}</strong>
+        <span>${escapeHtml(actionText(action, "copy"))}</span>
+      </a>
+    `;
+  }
+
   const attrs = {
     page: action.behavior === "page" ? `data-safe-action-page="${action.page}"` : "",
     communication: action.behavior === "communication" ? `data-safe-scroll-communication` : "",
@@ -269,8 +285,8 @@ function renderAction(action, scenario) {
 
   return `
     <button class="surface safe-action-v1-card ${scenario.emergency ? "is-emergency-soft" : ""}" type="button" ${Object.values(attrs).filter(Boolean).join(" ")}>
-      <strong>${escapeHtml(localize(action.label))}</strong>
-      <span>${escapeHtml(localize(action.copy))}</span>
+      <strong>${escapeHtml(actionText(action, "label"))}</strong>
+      <span>${escapeHtml(actionText(action, "copy"))}</span>
     </button>
   `;
 }

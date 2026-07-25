@@ -4,6 +4,7 @@ import { t } from '../i18n.js';
 import { pageShell } from '../components/layout.js';
 import { choiceChip } from '../components/cards.js';
 import { ensureDayPlanIdentity, hasSavedDayPlan } from '../storage.js';
+import { buildGoogleMapsDirectionsUrl, buildGoogleMapsLocationUrl } from '../utils/maps.js';
 
 export const dayDurationOptions = [
   { label: "2 Hours", value: "2h" },
@@ -85,6 +86,8 @@ function normalizeStop(stop) {
     placeId: stop.placeId || stop.id || "",
     budget: stop.budget || "",
     distance: stop.distance || "",
+    lat: stop.lat ?? "",
+    lng: stop.lng ?? "",
   };
 }
 
@@ -99,6 +102,8 @@ function placeToStop(place, type, index) {
     placeId: place.id,
     budget: place.budget,
     distance: place.distance,
+    lat: place.lat,
+    lng: place.lng,
   };
 }
 
@@ -113,7 +118,92 @@ function fallbackStop(type, index) {
     placeId: "",
     budget: state.dayBudget,
     distance: "",
+    lat: "",
+    lng: "",
   };
+}
+
+function normalizeLookup(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function resolveStopPlace(stop) {
+  if (!stop) return null;
+  const placeId = stop.placeId || stop.id || "";
+  if (placeId) {
+    const byId = state.catalogs.places.find((place) => place.id === placeId);
+    if (byId) return byId;
+  }
+
+  const title = normalizeLookup(stop.title || stop.name);
+  if (!title) return null;
+  return state.catalogs.places.find((place) => normalizeLookup(place.name) === title) || null;
+}
+
+function mapPointForStop(stop) {
+  const directUrl = buildGoogleMapsLocationUrl({
+    lat: stop.lat,
+    lng: stop.lng,
+    label: stop.area || stop.title,
+  });
+  if (directUrl) {
+    return {
+      lat: stop.lat,
+      lng: stop.lng,
+      area: stop.area,
+      url: directUrl,
+    };
+  }
+
+  const place = resolveStopPlace(stop);
+  const placeUrl = buildGoogleMapsLocationUrl({
+    lat: place?.lat,
+    lng: place?.lng,
+    label: place?.area || place?.name,
+  });
+  if (!placeUrl) return null;
+
+  return {
+    lat: place.lat,
+    lng: place.lng,
+    area: place.area || stop.area,
+    url: placeUrl,
+  };
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function renderStopMapAction(stop) {
+  const point = mapPointForStop(stop);
+  if (!point) return "";
+  return `
+    <a class="text-button day-stop-map-link" href="${escapeHtml(point.url)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${t("mapsViewStopA11y")}: ${point.area || stop.title}. ${t("mapsOpensExternal")}`)}">
+      ${t("mapsViewInMaps")} →
+    </a>
+  `;
+}
+
+function routeUrlForPlan(plan) {
+  const points = plan.map((stop) => mapPointForStop(stop)).filter(Boolean);
+  if (points.length < 2) return null;
+
+  const origin = points[0];
+  const destination = points[points.length - 1];
+  return buildGoogleMapsDirectionsUrl({
+    originLat: origin.lat,
+    originLng: origin.lng,
+    destinationLat: destination.lat,
+    destinationLng: destination.lng,
+    waypoints: points.slice(1, -1),
+    travelMode: "walking",
+  });
 }
 
 function preferenceScore(place, type) {
@@ -247,6 +337,8 @@ export function createCurrentDayPlan(suggestion = getDaySuggestion()) {
     area: stop.area,
     placeId: stop.placeId || "",
     description: stop.description || "",
+    lat: stop.lat || "",
+    lng: stop.lng || "",
   }));
 
   return ensureDayPlanIdentity({
@@ -276,6 +368,8 @@ export function createDraftDayPlan() {
     area: stop.area,
     placeId: stop.placeId || "",
     description: stop.description || "",
+    lat: stop.lat || "",
+    lng: stop.lng || "",
   }));
 
   return ensureDayPlanIdentity({
@@ -433,6 +527,7 @@ function renderSuggestionDetail(suggestion) {
   const plan = getDayPlan();
   const includedTypes = [...new Set(plan.map((stop) => stop.type))];
   const routeText = `Route placeholder: ${plan.map((stop) => stop.title).join(" → ")}.`;
+  const routeUrl = routeUrlForPlan(plan);
   const currentPlan = createCurrentDayPlan(suggestion);
   const isSaved = hasSavedDayPlan(state.savedDays, currentPlan);
 
@@ -468,6 +563,7 @@ function renderSuggestionDetail(suggestion) {
                     <strong>${stop.title}</strong>
                     <span>${stop.type} · ${stop.area}</span>
                     <p>${stop.description}</p>
+                    ${renderStopMapAction(stop)}
                   </div>
                   ${renderStopActions(stop, index, plan.length)}
                 </article>
@@ -494,6 +590,11 @@ function renderSuggestionDetail(suggestion) {
         <p class="eyebrow">Route placeholder</p>
         <h3>Map route will live here.</h3>
         <p>${routeText}</p>
+        ${
+          routeUrl
+            ? `<a class="soft-button route-map-link" href="${escapeHtml(routeUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${t("mapsOpenRouteA11y")}. ${t("mapsOpensExternal")}`)}">${t("mapsOpenRouteInMaps")}</a>`
+            : ""
+        }
         <div class="route-line" aria-hidden="true">
           ${plan.map((stop) => `<span>${stop.time}</span>`).join("")}
         </div>
@@ -509,6 +610,7 @@ function renderCurrentDraft() {
   const plan = getDayPlan();
   const includedTypes = [...new Set(plan.map((stop) => stop.type))];
   const routeText = `Route placeholder: ${plan.map((stop) => stop.title).join(" → ")}.`;
+  const routeUrl = routeUrlForPlan(plan);
 
   return `
     <section class="day-detail-layout current-day-draft">
@@ -543,6 +645,7 @@ function renderCurrentDraft() {
                     <strong>${stop.title}</strong>
                     <span>${stop.type} · ${stop.area}</span>
                     <p>${stop.description}</p>
+                    ${renderStopMapAction(stop)}
                   </div>
                   ${renderStopActions(stop, index, plan.length)}
                 </article>
@@ -580,6 +683,11 @@ function renderCurrentDraft() {
         <p class="eyebrow">Route placeholder</p>
         <h3>Map route will live here.</h3>
         <p>${routeText}</p>
+        ${
+          routeUrl
+            ? `<a class="soft-button route-map-link" href="${escapeHtml(routeUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${t("mapsOpenRouteA11y")}. ${t("mapsOpensExternal")}`)}">${t("mapsOpenRouteInMaps")}</a>`
+            : ""
+        }
         <div class="route-line" aria-hidden="true">
           ${plan.map((stop) => `<span>${stop.time}</span>`).join("")}
         </div>

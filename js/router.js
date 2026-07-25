@@ -507,6 +507,8 @@ function savedPlanToStops(plan) {
       area: stop.area || plan.area || state.dayArea,
       description: stop.description || stop.note || "Saved HER Day stop.",
       placeId: stop.placeId || stop.place_id || "",
+      lat: stop.lat ?? "",
+      lng: stop.lng ?? "",
     }));
   }
 
@@ -520,6 +522,8 @@ function savedPlanToStops(plan) {
       area: plan.area || state.dayArea,
       description: "Saved HER Day stop.",
       placeId: "",
+      lat: "",
+      lng: "",
     };
   });
 }
@@ -538,6 +542,8 @@ function placeToDayStop(place) {
     placeId: place.id,
     budget: place.priceRange || place.budget || "",
     distance: place.distance || "",
+    lat: place.lat,
+    lng: place.lng,
   };
 }
 
@@ -1257,6 +1263,8 @@ function bindPageEvents() {
           placeId: place.id,
           budget: place.budget,
           distance: place.distance,
+          lat: place.lat,
+          lng: place.lng,
         };
         state.dayPlan = reflowDayPlan(plan);
         syncCurrentDraftIfNeeded();

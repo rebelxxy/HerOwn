@@ -1,7 +1,9 @@
 import { state, PICTURE_ROOT } from '../state.js';
 import { categoryIcons, categoryMap, placeCategories, placeExperienceFilters } from '../data.js';
+import { t } from '../i18n.js';
 import { pageShell, sectionHead } from '../components/layout.js';
 import { filterChip } from '../components/cards.js';
+import { buildGoogleMapsLocationUrl } from '../utils/maps.js';
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -22,17 +24,110 @@ function asArray(value) {
   return [value];
 }
 
-function placeImage(place, index) {
+const areaLabelKeys = {
+  Kichijoji: "placesAreaKichijoji",
+  Shinjuku: "placesAreaShinjuku",
+  Shimokitazawa: "placesAreaShimokitazawa",
+  Ueno: "placesAreaUeno",
+  Tokyo: "placesAreaTokyoOverview",
+};
+
+const areaClassNames = {
+  Kichijoji: "area-kichijoji",
+  Shinjuku: "area-shinjuku",
+  Shimokitazawa: "area-shimokitazawa",
+  Ueno: "area-ueno",
+  Tokyo: "area-tokyo-overview",
+};
+
+const stationKeys = {
+  Kichijoji: "placeStationKichijoji",
+  Shinjuku: "placeStationShinjuku",
+  Shimokitazawa: "placeStationShimokitazawa",
+  Ueno: "placeStationUeno",
+};
+
+function formatText(key, values = {}) {
+  return Object.entries(values).reduce((text, [name, value]) => {
+    return text.replaceAll(`{${name}}`, value);
+  }, t(key));
+}
+
+function catalogIndex(place) {
+  return state.catalogs.places.findIndex((item) => item.id === place?.id);
+}
+
+function placeImage(place, index = null) {
   const fallbackImages = ["037_place_01.png", "038_place_02.png", "039_place_03.png", "040_place_04.png", "041_place_05.png"];
-  return `${PICTURE_ROOT}${place.image || fallbackImages[index % fallbackImages.length]}`;
+  const fallbackIndex = Number.isInteger(index) ? index : catalogIndex(place);
+  const safeIndex = fallbackIndex >= 0 ? fallbackIndex : 0;
+  return `${PICTURE_ROOT}${place.image || fallbackImages[safeIndex % fallbackImages.length]}`;
+}
+
+function popoverVisual(place) {
+  const categoryImageMap = {
+    Cafe: "037_place_01.png",
+    Bookstore: "038_place_02.png",
+    "Flower Shop": "039_place_03.png",
+    Park: "040_place_04.png",
+    Museum: "041_place_05.png",
+  };
+  const expectedImage = categoryImageMap[place?.category];
+
+  if (expectedImage && place?.image === expectedImage) {
+    return `<img class="popover-place-image" src="${PICTURE_ROOT}${expectedImage}" alt="" />`;
+  }
+
+  return `
+    <div class="popover-category-icon" aria-hidden="true">
+      ${categoryIcons[place?.category] || "⌖"}
+    </div>
+  `;
 }
 
 function placeTags(place) {
   return [...asArray(place.experienceTags), ...asArray(place.practicalTags)];
 }
 
+function mapUrlForPlace(place) {
+  if (!place) return null;
+  return buildGoogleMapsLocationUrl({
+    lat: place.lat,
+    lng: place.lng,
+    label: place.area || place.name,
+  });
+}
+
 function primaryTags(place) {
   return placeTags(place).slice(0, 3);
+}
+
+function areaLabel(area) {
+  return t(areaLabelKeys[area] || "placesAreaTokyoOverview");
+}
+
+function areaClass(area) {
+  return areaClassNames[area] || areaClassNames.Tokyo;
+}
+
+function stationLabel(place) {
+  const key = stationKeys[place?.area];
+  return key ? t(key) : place?.distanceFrom || place?.area || "";
+}
+
+function distanceLabel(place) {
+  if (!place?.distance) return "";
+  const point = stationLabel(place);
+  return point ? formatText("placesDistanceFrom", { distance: place.distance, point }) : place.distance;
+}
+
+function placeMeta(place, options = {}) {
+  const includeDistance = options.includeDistance !== false;
+  return [
+    place.category,
+    place.area,
+    includeDistance ? distanceLabel(place) : "",
+  ].filter(Boolean).join(" · ");
 }
 
 function searchText(place) {
@@ -86,7 +181,7 @@ function placeCard(place, index, selected) {
       <img class="mini-thumb image-thumb" src="${placeImage(place, index)}" alt="" />
       <div class="places-card-copy">
         <strong>${escapeHtml(place.name)}</strong>
-        <p>${escapeHtml(place.category)} · ${escapeHtml(place.area)} · ${escapeHtml(place.distance)}</p>
+        <p>${escapeHtml(placeMeta(place))}</p>
         <span>${escapeHtml(place.description || place.reason || "")}</span>
         ${tagMarkup(primaryTags(place))}
       </div>
@@ -95,43 +190,102 @@ function placeCard(place, index, selected) {
   `;
 }
 
+function clampPercent(value, fallback, min, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
+}
+
+function fallbackMapPosition(place) {
+  const seed = String(place?.id || place?.name || "place");
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (Math.imul(31, hash) + seed.charCodeAt(index)) | 0;
+  }
+  const positive = Math.abs(hash);
+  return {
+    x: 24 + (positive % 44),
+    y: 30 + ((positive >> 4) % 34),
+  };
+}
+
+function mapPosition(place) {
+  const fallback = fallbackMapPosition(place);
+  return {
+    x: clampPercent(place?.mapPosition?.x, fallback.x, 18, 82),
+    y: clampPercent(place?.mapPosition?.y, fallback.y, 24, 78),
+  };
+}
+
+function pinStyle(place) {
+  const position = mapPosition(place);
+  return `--pin-x: ${position.x}%; --pin-y: ${position.y}%;`;
+}
+
+function activeMapArea(visiblePlaces, selected) {
+  return selected?.area || visiblePlaces[0]?.area || "Tokyo";
+}
+
+function mapBadges(area) {
+  return `
+    <div class="map-badge-stack">
+      <span class="prototype-badge">${t("mapsPrototypeMap")}</span>
+      <span class="area-badge">${escapeHtml(areaLabel(area))}</span>
+    </div>
+  `;
+}
+
 function mapPanel(visiblePlaces, selected) {
+  const activeArea = activeMapArea(visiblePlaces, selected);
+  const mapPlaces = activeArea === "Tokyo"
+    ? []
+    : visiblePlaces.filter((place) => place.area === activeArea);
+
   if (!visiblePlaces.length) {
     return `
-      <section class="map-panel product-map places-prototype-map" aria-label="HER Places prototype map">
+      <section class="map-panel product-map places-prototype-map ${areaClass(activeArea)}" aria-label="${escapeHtml(`${t("mapsPrototypeMap")} ${areaLabel(activeArea)}`)}">
         <img class="map-art" src="${PICTURE_ROOT}035_ui_map_panel.png" alt="" />
-        <span class="prototype-badge">Prototype map</span>
+        ${mapBadges(activeArea)}
+        <p class="map-disclosure">${t("mapsIllustrativeDisclosure")}</p>
         <article class="map-place-popover places-empty-popover">
           <div>
-            <h3>No matching places on this prototype map.</h3>
-            <p>Try clearing search or filters to see demo places again.</p>
+            <h3>${t("mapsUnavailable")}</h3>
+            <p>${t("placesMapEmptyCopy")}</p>
           </div>
         </article>
       </section>
     `;
   }
 
+  const selectedMapsUrl = mapUrlForPlace(selected);
+
   return `
-    <section class="map-panel product-map places-prototype-map" aria-label="HER Places prototype map">
+    <section class="map-panel product-map places-prototype-map ${areaClass(activeArea)}" aria-label="${escapeHtml(`${t("mapsPrototypeMap")} ${areaLabel(activeArea)}`)}">
       <img class="map-art" src="${PICTURE_ROOT}035_ui_map_panel.png" alt="" />
-      <span class="prototype-badge">Prototype map</span>
-      ${visiblePlaces
-        .map((place, index) => `
-          <button class="map-pin place-pin pin-${index % 8} ${selected && place.id === selected.id ? "is-selected" : ""}" type="button" data-place="${escapeHtml(place.id)}" aria-label="${escapeHtml(place.name)}">
+      ${mapBadges(activeArea)}
+      ${mapPlaces
+        .map((place) => `
+          <button class="map-pin place-pin ${selected && place.id === selected.id ? "is-selected" : ""}" type="button" data-place="${escapeHtml(place.id)}" style="${escapeHtml(pinStyle(place))}" aria-label="${escapeHtml(`${place.name}, ${areaLabel(place.area)}`)}">
             ${categoryIcons[place.category] || "⌖"}
           </button>
         `)
         .join("")}
+      <p class="map-disclosure">${t("mapsIllustrativeDisclosure")}</p>
       ${
         selected
           ? `
             <article class="map-place-popover places-map-card">
-              <img class="popover-place-image" src="${placeImage(selected, visiblePlaces.indexOf(selected))}" alt="" />
+              ${popoverVisual(selected)}
               <div>
                 <h3>${escapeHtml(selected.name)}</h3>
-                <p>${escapeHtml(selected.category)} · ${escapeHtml(selected.area)} · ${escapeHtml(selected.distance)}</p>
-                ${tagMarkup(primaryTags(selected))}
+                <p>${escapeHtml(placeMeta(selected, { includeDistance: false }))}</p>
+                ${tagMarkup(primaryTags(selected).slice(0, 2))}
               </div>
+              ${
+                selectedMapsUrl
+                  ? `<a class="text-button map-popover-link" href="${escapeHtml(selectedMapsUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${t("mapsOpenAreaA11y")}: ${selected.area}. ${t("mapsOpensExternal")}`)}">${t("mapsViewInMaps")} →</a>`
+                  : ""
+              }
             </article>
           `
           : ""
@@ -156,16 +310,17 @@ function detailPanel(selected) {
   const addedToDraft = draftStops.some((stop) => stop.placeId === selected.id);
   const experienceTags = asArray(selected.experienceTags);
   const practicalTags = asArray(selected.practicalTags);
+  const mapsUrl = mapUrlForPlace(selected);
 
   return `
     <article class="surface place-detail-panel places-detail-panel">
       <div class="places-detail-head">
         <div>
-          <p class="eyebrow">${escapeHtml(selected.category)} · ${escapeHtml(selected.area)} · ${escapeHtml(selected.distance)}</p>
+          <p class="eyebrow">${escapeHtml(placeMeta(selected))}</p>
           <h2>${escapeHtml(selected.name)}</h2>
           <p>${escapeHtml(selected.description || selected.reason || "")}</p>
         </div>
-        <img src="${placeImage(selected, 0)}" alt="" />
+        <img src="${placeImage(selected)}" alt="" />
       </div>
       <div class="places-detail-grid">
         <div>
@@ -191,10 +346,15 @@ function detailPanel(selected) {
       </div>
       ${
         selected.prototypeData
-          ? `<p class="prototype-note">Prototype data: this is a fictional demo place for product testing, not a verified real-world safety claim.</p>`
+          ? `<p class="prototype-note">${t("mapsPrototypeDisclosure")}</p>`
           : ""
       }
       <div class="day-detail-actions places-detail-actions">
+        ${
+          mapsUrl
+            ? `<a class="soft-button map-action-link" href="${escapeHtml(mapsUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${t("mapsOpenAreaA11y")}: ${selected.area}. ${t("mapsOpensExternal")}`)}">${t("mapsOpenAreaInMaps")}</a>`
+            : `<button class="soft-button" type="button" disabled>${t("mapsUnavailable")}</button>`
+        }
         ${
           saved
             ? `<button class="soft-button is-saved" type="button" disabled>Saved</button>`

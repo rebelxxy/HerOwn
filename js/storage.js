@@ -112,6 +112,8 @@ function normalizeDraftStop(stop) {
       placeId: "",
       budget: "",
       distance: "",
+      lat: "",
+      lng: "",
     };
   }
 
@@ -124,6 +126,8 @@ function normalizeDraftStop(stop) {
     placeId: stop.placeId || stop.place_id || stop.id || "",
     budget: stop.budget || "",
     distance: stop.distance || "",
+    lat: stop.lat ?? "",
+    lng: stop.lng ?? "",
   };
 }
 

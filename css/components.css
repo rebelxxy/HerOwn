@@ -654,25 +654,19 @@ h1,
 }
 
 .place-pin {
+  left: var(--pin-x, 50%);
+  top: var(--pin-y, 50%);
   border-color: var(--line-strong);
   background: #fffdf9;
   color: var(--ink);
   cursor: pointer;
+  transform: translate(-50%, -50%);
 }
 
 .place-pin.is-selected {
   background: #f8ded9;
-  transform: scale(1.08);
+  transform: translate(-50%, -50%) scale(1.08);
 }
-
-.pin-0 { left: 12%; top: 16%; }
-.pin-1 { left: 28%; top: 58%; }
-.pin-2 { left: 48%; top: 28%; }
-.pin-3 { left: 67%; top: 18%; }
-.pin-4 { left: 76%; top: 62%; }
-.pin-5 { left: 38%; top: 76%; }
-.pin-6 { left: 86%; top: 34%; }
-.pin-7 { left: 18%; top: 72%; }
 
 .map-place-popover {
   position: absolute;
