@@ -1,4 +1,4 @@
-import { state, PICTURE_ROOT } from '../state.js';
+import { state } from '../state.js';
 import { livingCategories } from '../data.js';
 import { pageShell } from '../components/layout.js';
 import { categoryButton } from '../components/cards.js';
@@ -238,7 +238,7 @@ export function renderLiving() {
         <h1 class="section-title">HER Living</h1>
         <p class="section-copy">Practical guides for independent living.</p>
       </div>
-      <img src="${PICTURE_ROOT}004_large_laundry_room.png" alt="" />
+      <img src="images/living.png" alt="" />
     </div>
     ${activeGuide ? renderGuideDetail(activeGuide) : renderLivingHome()}
   `);

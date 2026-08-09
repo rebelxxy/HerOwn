@@ -4,7 +4,22 @@ import { saveDayPlan, saveFavoritePlace } from './api.js';
 import { clearCurrentDayDraft, hasSavedDayPlan, mergeDayPlans, persistCurrentDayDraft, persistNotes, persistSavedDays, persistSavedGuides, persistSavedPlaces } from './storage.js';
 import { renderAssistant } from './components/assistant.js';
 import { renderHome } from './pages/home.js';
-import { renderSafe } from './pages/safe.js';
+import {
+  acceptSafetyCall,
+  cancelSafetyCall,
+  cancelSafetyCallCountdown,
+  declineSafetyCall,
+  endSafetyCall,
+  finishSafetyCall,
+  goToSafetyCallStep,
+  openSafetyCall,
+  renderSafe,
+  setSafetyCallCaller,
+  setSafetyCallDelay,
+  setSafetyCallRender,
+  startSafetyCallCountdown,
+  toggleSafetyCallSound,
+} from './pages/safe.js';
 import { renderFakeCall, startFakeCall, answerFakeCall, closeCallOverlay } from './pages/fakeCall.js';
 import { renderSOS } from './pages/sos.js';
 import { renderLiving } from './pages/living.js';
@@ -189,6 +204,20 @@ function renderPreservingScroll(focusMatch = null) {
       : null;
     restoreViewport(scrollX, scrollY, "");
     button?.focus({ preventScroll: true });
+  });
+}
+
+function revealDayAdjustPanel() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const panel = app.querySelector(".day-adjust-panel");
+      if (!panel) return;
+      const rect = panel.getBoundingClientRect();
+      const bottomBuffer = Math.min(96, window.innerHeight * 0.18);
+      if (rect.top < 16 || rect.bottom > window.innerHeight - bottomBuffer) {
+        panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    });
   });
 }
 
@@ -538,7 +567,7 @@ function placeToDayStop(place) {
     title: place.name,
     type: place.category,
     area: place.area,
-    description: recommended || place.description || place.reason || "Added from HER Places.",
+    description: recommended || place.description || place.reason || t("dayAddedFromPlacesFallback"),
     placeId: place.id,
     budget: place.priceRange || place.budget || "",
     distance: place.distance || "",
@@ -552,7 +581,7 @@ function persistDraftFromState(overrides = {}) {
   state.dayPlan = stops;
   const draft = persistCurrentDayDraft({
     id: state.currentDayDraft?.id || "current-day-draft",
-    title: state.currentDayDraft?.title || "My HER Day",
+    title: state.currentDayDraft?.title || t("dayDefaultDraftTitle"),
     area: state.dayArea,
     duration: state.dayTime,
     budget: state.dayBudget,
@@ -577,6 +606,51 @@ function clearCurrentDraftState() {
   state.selectedDaySuggestion = "";
   state.dayAdjustOpen = false;
   state.pendingDiscardDayDraft = false;
+}
+
+function placeCoordinates(place) {
+  const lat = Number(place?.lat);
+  const lng = Number(place?.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
+function clearSafeRouteResults() {
+  state.safeRouteHasResults = false;
+  state.selectedSafeRoute = "main";
+}
+
+function fillSafeRouteDestination(place) {
+  state.safeRouteTo = place.name;
+  state.safeRouteToPlaceId = place.id;
+  state.safeRouteToCoordinates = placeCoordinates(place);
+  state.safeRouteToError = "";
+  state.safeRouteSavedPickerOpen = false;
+  clearSafeRouteResults();
+}
+
+function updateSafeRouteManualField(field, value) {
+  const text = String(value || "").trim();
+  if (field === "from") {
+    state.safeRouteFrom = text;
+    state.safeRouteFromError = "";
+    state.safeRouteLocationError = "";
+    state.safeRouteLocationStatus = "idle";
+    if (state.safeRouteFromSource !== "currentLocation" || text !== t("safeRouteCurrentLocation")) {
+      state.safeRouteFromSource = "manual";
+      state.safeRouteFromCoordinates = null;
+    }
+  } else if (field === "to") {
+    state.safeRouteTo = text;
+    state.safeRouteToError = "";
+    const selectedPlace = state.safeRouteToPlaceId
+      ? state.catalogs.places.find((place) => place.id === state.safeRouteToPlaceId)
+      : null;
+    if (!selectedPlace || text !== selectedPlace.name) {
+      state.safeRouteToPlaceId = "";
+      state.safeRouteToCoordinates = null;
+    }
+  }
+  clearSafeRouteResults();
 }
 
 function bindPageEvents() {
@@ -730,7 +804,7 @@ function bindPageEvents() {
       const dayId = button.dataset.confirmDeleteDay;
       state.savedDays = persistSavedDays(state.savedDays.filter((day) => day.id !== dayId));
       state.pendingDeleteDayId = "";
-      showToast("Day plan deleted");
+      showToast(t("dayDeletedToast"));
       render();
     });
   });
@@ -843,6 +917,135 @@ function bindPageEvents() {
     });
   });
 
+  app.querySelectorAll("[data-safe-route-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedSafe = "route";
+      state.safeRouteFromError = "";
+      state.safeRouteToError = "";
+      renderPreservingScroll();
+    });
+  });
+
+  app.querySelectorAll("[data-safe-route-form]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const formData = new FormData(form);
+      const from = String(formData.get("safeRouteFrom") || "").trim();
+      const to = String(formData.get("safeRouteTo") || "").trim();
+      const currentLocationLabel = t("safeRouteCurrentLocation");
+      const selectedPlace = state.safeRouteToPlaceId
+        ? state.catalogs.places.find((place) => place.id === state.safeRouteToPlaceId)
+        : null;
+
+      if (state.safeRouteFromSource === "currentLocation" && from === currentLocationLabel && state.safeRouteFromCoordinates) {
+        state.safeRouteFrom = currentLocationLabel;
+      } else {
+        state.safeRouteFrom = from;
+        state.safeRouteFromSource = "manual";
+        state.safeRouteFromCoordinates = null;
+      }
+
+      if (selectedPlace && to === selectedPlace.name) {
+        state.safeRouteTo = selectedPlace.name;
+        state.safeRouteToCoordinates = placeCoordinates(selectedPlace);
+      } else {
+        state.safeRouteTo = to;
+        state.safeRouteToPlaceId = "";
+        state.safeRouteToCoordinates = null;
+      }
+
+      state.safeRouteFromError = from ? "" : "safeRouteFromRequired";
+      state.safeRouteToError = to ? "" : "safeRouteToRequired";
+      state.safeRouteLocationError = "";
+      state.safeRouteSavedPickerOpen = false;
+      state.safeRouteHasResults = Boolean(from && to);
+      if (state.safeRouteHasResults) state.selectedSafeRoute = "main";
+      renderPreservingScroll();
+    });
+  });
+
+  app.querySelectorAll("[data-safe-route-input]").forEach((input) => {
+    input.addEventListener("input", () => {
+      updateSafeRouteManualField(input.dataset.safeRouteInput, input.value);
+    });
+  });
+
+  app.querySelectorAll("[data-safe-route-current-location]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!navigator.geolocation) {
+        state.safeRouteLocationStatus = "error";
+        state.safeRouteLocationError = "safeRouteLocationAccessFailed";
+        state.safeRouteFromSource = "manual";
+        state.safeRouteFromCoordinates = null;
+        clearSafeRouteResults();
+        renderPreservingScroll();
+        return;
+      }
+
+      state.safeRouteLocationStatus = "loading";
+      state.safeRouteLocationError = "";
+      renderPreservingScroll();
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          state.safeRouteFrom = t("safeRouteCurrentLocation");
+          state.safeRouteFromSource = "currentLocation";
+          state.safeRouteFromCoordinates = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          state.safeRouteFromError = "";
+          state.safeRouteLocationStatus = "ready";
+          state.safeRouteLocationError = "";
+          clearSafeRouteResults();
+          renderPreservingScroll();
+        },
+        (error) => {
+          state.safeRouteLocationStatus = "error";
+          state.safeRouteLocationError = error.code === 1
+            ? "safeRouteLocationDenied"
+            : "safeRouteLocationAccessFailed";
+          state.safeRouteFromSource = "manual";
+          state.safeRouteFromCoordinates = null;
+          clearSafeRouteResults();
+          renderPreservingScroll();
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 60000,
+        },
+      );
+    });
+  });
+
+  app.querySelectorAll("[data-safe-route-saved-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.safeRouteSavedPickerOpen = !state.safeRouteSavedPickerOpen;
+      renderPreservingScroll();
+    });
+  });
+
+  app.querySelectorAll("[data-safe-route-saved-place]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const place = state.catalogs.places.find((item) => item.id === button.dataset.safeRouteSavedPlace);
+      if (!place) return;
+      fillSafeRouteDestination(place);
+      renderPreservingScroll();
+    });
+  });
+
+  app.querySelectorAll("[data-safe-route-option]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedSafeRoute = button.dataset.safeRouteOption || "main";
+      renderPreservingScroll({
+        selector: "[data-safe-route-option]",
+        datasetKey: "safeRouteOption",
+        value: state.selectedSafeRoute,
+      });
+    });
+  });
+
   app.querySelectorAll("[data-safe-action-page]").forEach((button) => {
     button.addEventListener("click", () => {
       navigate(button.dataset.safeActionPage);
@@ -892,6 +1095,68 @@ function bindPageEvents() {
       const expanded = button.getAttribute("aria-expanded") === "true";
       button.setAttribute("aria-expanded", String(!expanded));
       if (panel) panel.hidden = expanded;
+    });
+  });
+
+  app.querySelectorAll("[data-safety-call-open]").forEach((button) => {
+    button.addEventListener("click", openSafetyCall);
+  });
+
+  app.querySelectorAll("[data-safety-call-caller]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setSafetyCallCaller(button.dataset.safetyCallCaller);
+    });
+  });
+
+  app.querySelectorAll("[data-safety-call-delay]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setSafetyCallDelay(button.dataset.safetyCallDelay);
+    });
+  });
+
+  app.querySelectorAll("[data-safety-call-step]").forEach((button) => {
+    button.addEventListener("click", () => {
+      goToSafetyCallStep(button.dataset.safetyCallStep);
+    });
+  });
+
+  app.querySelectorAll("[data-safety-call-begin]").forEach((button) => {
+    button.addEventListener("click", startSafetyCallCountdown);
+  });
+
+  app.querySelectorAll("[data-safety-call-cancel]").forEach((button) => {
+    button.addEventListener("click", cancelSafetyCall);
+  });
+
+  app.querySelectorAll("[data-safety-call-accept]").forEach((button) => {
+    button.addEventListener("click", acceptSafetyCall);
+  });
+
+  app.querySelectorAll("[data-safety-call-decline]").forEach((button) => {
+    button.addEventListener("click", declineSafetyCall);
+  });
+
+  app.querySelectorAll("[data-safety-call-end]").forEach((button) => {
+    button.addEventListener("click", endSafetyCall);
+  });
+
+  app.querySelectorAll("[data-safety-call-done]").forEach((button) => {
+    button.addEventListener("click", finishSafetyCall);
+  });
+
+  app.querySelectorAll("[data-safety-call-sound]").forEach((button) => {
+    button.addEventListener("click", toggleSafetyCallSound);
+  });
+
+  app.querySelectorAll("[data-safe-scenario-guide]").forEach((button) => {
+    button.addEventListener("click", () => {
+      app.querySelector("#safeScenarioGuide")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+
+  app.querySelectorAll("[data-safety-call-emergency-phrases]").forEach((button) => {
+    button.addEventListener("click", () => {
+      openSafeModal(button.dataset.safetyCallEmergencyPhrases, t("safetyCallEmergencyPhrases"));
     });
   });
 
@@ -1064,6 +1329,18 @@ function bindPageEvents() {
     });
   });
 
+  app.querySelectorAll("[data-open-safe-route-place]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const place = state.catalogs.places.find((item) => item.id === button.dataset.openSafeRoutePlace);
+      if (!place) return;
+      fillSafeRouteDestination(place);
+      state.selectedSafe = "route";
+      state.safeRouteFromError = "";
+      state.safeRouteLocationError = "";
+      navigate("safe");
+    });
+  });
+
   app.querySelectorAll("[data-save-place]").forEach((button) => {
     button.addEventListener("click", () => {
       const id = button.dataset.savePlace;
@@ -1091,14 +1368,14 @@ function bindPageEvents() {
         state.dayArea = state.currentDayDraft?.area || place.area || state.dayArea;
         state.dayPlan = reflowDayPlan([...currentPlan, placeToDayStop(place)]);
         persistDraftFromState({
-          title: state.currentDayDraft?.title || "My HER Day",
+          title: state.currentDayDraft?.title || t("dayDefaultDraftTitle"),
           area: state.dayArea,
         });
       }
       state.selectedDaySuggestion = "";
-      showToast("Added to your current HER Day", [
-        { label: "View HER Day", onClick: () => navigate("day") },
-        { label: "Keep browsing" },
+      showToast(t("dayAddedDraftToast"), [
+        { label: t("dayViewHerDay"), onClick: () => navigate("day") },
+        { label: t("dayKeepBrowsing") },
       ]);
       render();
     });
@@ -1121,7 +1398,7 @@ function bindPageEvents() {
 
   app.querySelectorAll("[data-create-my-day]").forEach((button) => {
     button.addEventListener("click", () => {
-      showToast("Coming Soon");
+      showToast(t("dayComingSoon"));
     });
   });
 
@@ -1136,8 +1413,10 @@ function bindPageEvents() {
 
   app.querySelectorAll("[data-toggle-day-adjust]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.dayAdjustOpen = !state.dayAdjustOpen;
-      render();
+      const willOpen = !state.dayAdjustOpen;
+      state.dayAdjustOpen = willOpen;
+      renderPreservingScroll();
+      if (willOpen) revealDayAdjustPanel();
     });
   });
 
@@ -1185,7 +1464,7 @@ function bindPageEvents() {
       state.dayPlan = generateAdjustedDayPlan();
       state.dayAdjustOpen = false;
       syncCurrentDraftIfNeeded();
-      showToast("Day adjusted");
+      showToast(t("dayAdjustedToast"));
       render();
     });
   });
@@ -1195,14 +1474,14 @@ function bindPageEvents() {
       const suggestion = getDaySuggestion(button.dataset.saveDaySuggestion);
       const localPlan = createCurrentDayPlan(suggestion);
       if (hasSavedDayPlan(state.savedDays, localPlan)) {
-        showToast("Saved to My Days");
+        showToast(t("daySavedToast"));
         render();
         return;
       }
 
       state.savedDays = persistSavedDays(mergeDayPlans([localPlan], state.savedDays));
       void saveDayPlan(state.user.id, createDayPlanApiPayload(localPlan));
-      showToast("Saved to My Days");
+      showToast(t("daySavedToast"));
       render();
     });
   });
@@ -1215,7 +1494,7 @@ function bindPageEvents() {
         void saveDayPlan(state.user.id, createDayPlanApiPayload(localPlan));
       }
       clearCurrentDraftState();
-      showToast("Saved to My Days");
+      showToast(t("daySavedToast"));
       render();
     });
   });
@@ -1237,14 +1516,14 @@ function bindPageEvents() {
   app.querySelectorAll("[data-confirm-discard-day-draft]").forEach((button) => {
     button.addEventListener("click", () => {
       clearCurrentDraftState();
-      showToast("Draft discarded");
+      showToast(t("dayDraftDiscardedToast"));
       render();
     });
   });
 
   app.querySelectorAll("[data-start-route]").forEach((button) => {
     button.addEventListener("click", () => {
-      showToast("Route feature coming soon.");
+      showToast(t("dayNoRouteAvailable"));
     });
   });
 
@@ -1268,7 +1547,7 @@ function bindPageEvents() {
         };
         state.dayPlan = reflowDayPlan(plan);
         syncCurrentDraftIfNeeded();
-        showToast("Stop replaced");
+        showToast(t("dayStopReplacedToast"));
         render();
       }
     });
@@ -1282,7 +1561,7 @@ function bindPageEvents() {
         [plan[index - 1], plan[index]] = [plan[index], plan[index - 1]];
         state.dayPlan = reflowDayPlan(plan);
         syncCurrentDraftIfNeeded();
-        showToast("Moved up");
+        showToast(t("dayMovedUpToast"));
         render();
       }
     });
@@ -1296,7 +1575,7 @@ function bindPageEvents() {
         [plan[index], plan[index + 1]] = [plan[index + 1], plan[index]];
         state.dayPlan = reflowDayPlan(plan);
         syncCurrentDraftIfNeeded();
-        showToast("Moved down");
+        showToast(t("dayMovedDownToast"));
         render();
       }
     });
@@ -1308,7 +1587,7 @@ function bindPageEvents() {
       const plan = getDayPlan().filter((_, stopIndex) => stopIndex !== index);
       state.dayPlan = reflowDayPlan(plan);
       syncCurrentDraftIfNeeded();
-      showToast("Stop removed");
+      showToast(t("dayStopRemovedToast"));
       render();
     });
   });
@@ -1318,7 +1597,7 @@ function bindPageEvents() {
       const plan = [...getDayPlan(), createAdditionalDayStop()];
       state.dayPlan = reflowDayPlan(plan);
       syncCurrentDraftIfNeeded();
-      showToast("Stop added");
+      showToast(t("dayStopAddedToast"));
       render();
     });
   });
@@ -1337,6 +1616,8 @@ function bindPageEvents() {
 }
 
 export function initRouter() {
+  setSafetyCallRender(() => renderPreservingScroll());
+
   document.addEventListener('click', (event) => {
     const pageButton = event.target.closest('[data-page]');
     if (pageButton && !app.contains(pageButton)) navigate(pageButton.dataset.page);
@@ -1348,6 +1629,7 @@ export function initRouter() {
   document.addEventListener('keydown', (event) => {
     if (event.key === "Escape") {
       closeSafeModal();
+      cancelSafetyCallCountdown();
     }
   });
 

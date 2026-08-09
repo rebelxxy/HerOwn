@@ -23,6 +23,11 @@ function safeTravelMode(mode) {
   return ["driving", "walking", "bicycling", "transit"].includes(normalized) ? normalized : "walking";
 }
 
+function normalizeTextLocation(value) {
+  const text = String(value || "").trim();
+  return text || null;
+}
+
 export function hasValidCoordinates(point = {}) {
   return Boolean(coordinatePair(point.lat, point.lng));
 }
@@ -42,20 +47,22 @@ export function buildGoogleMapsSearchUrl({ query = "" } = {}) {
 }
 
 export function buildGoogleMapsDirectionsUrl({
+  origin,
   originLat,
   originLng,
+  destination,
   destinationLat,
   destinationLng,
   waypoints = [],
   travelMode = "walking",
 } = {}) {
-  const origin = coordinatePair(originLat, originLng);
-  const destination = coordinatePair(destinationLat, destinationLng);
-  if (!origin || !destination) return null;
+  const originValue = coordinatePair(originLat, originLng) || normalizeTextLocation(origin);
+  const destinationValue = coordinatePair(destinationLat, destinationLng) || normalizeTextLocation(destination);
+  if (!originValue || !destinationValue) return null;
 
   const baseParams = [
-    `origin=${encodeURIComponent(origin)}`,
-    `destination=${encodeURIComponent(destination)}`,
+    `origin=${encodeURIComponent(originValue)}`,
+    `destination=${encodeURIComponent(destinationValue)}`,
     `travelmode=${encodeURIComponent(safeTravelMode(travelMode))}`,
   ];
 

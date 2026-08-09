@@ -1,7 +1,13 @@
 import { state, ASSET_ROOT } from '../state.js';
 import { t } from '../i18n.js';
 import { pageShell } from '../components/layout.js';
-import { buildGoogleMapsSearchUrl } from '../utils/maps.js';
+import { buildGoogleMapsDirectionsUrl, buildGoogleMapsSearchUrl } from '../utils/maps.js';
+
+let safetyCallRender = () => {};
+let countdownTimer = null;
+let conversationTimer = null;
+let ringtoneTimer = null;
+let audioContext = null;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -15,6 +21,304 @@ function escapeHtml(value) {
 function localize(value) {
   if (!value || typeof value !== "object") return value || "";
   return value[state.lang] || value.en || "";
+}
+
+const safetyCallCallers = [
+  {
+    id: "anna",
+    avatar: "A",
+    name: "Anna",
+    preview: {
+      en: "I'm waiting outside.",
+      ja: "外で待っているね。",
+      zh: "我在外面等你。",
+    },
+    messages: {
+      en: ["Hey!", "Where are you?", "I'm already here.", "Take your time.", "I'll wait for you.", "See you soon."],
+      ja: ["もしもし。", "今どこにいる？", "もう近くにいるよ。", "急がなくて大丈夫。", "ここで待っているね。", "もうすぐ会おう。"],
+      zh: ["喂。", "你现在在哪里？", "我已经到附近了。", "不用急。", "我会等你。", "一会儿见。"],
+    },
+  },
+  {
+    id: "mia",
+    avatar: "M",
+    name: "Mia",
+    preview: {
+      en: "Did you get here?",
+      ja: "もう着いた？",
+      zh: "你到了吗？",
+    },
+    messages: {
+      en: ["Hi, it's me.", "Did you get here?", "I can stay on the line.", "Look for the brighter street.", "I'll meet you near the entrance.", "You're doing okay."],
+      ja: ["私だよ。", "もう着いた？", "このまま電話つないでおくね。", "明るい道を選んで。", "入口の近くで会おう。", "大丈夫、落ち着いているよ。"],
+      zh: ["是我。", "你到了吗？", "我可以先不挂电话。", "往亮一点的路走。", "我在入口附近等你。", "你做得很好。"],
+    },
+  },
+  {
+    id: "dad",
+    avatar: "D",
+    name: "Dad",
+    preview: {
+      en: "Are you home yet?",
+      ja: "もう家に着いた？",
+      zh: "你到家了吗？",
+    },
+    messages: {
+      en: ["Hey.", "Are you home yet?", "Tell me when you're near the station.", "Stay where there are people.", "I'll keep talking with you.", "Message me when you're inside."],
+      ja: ["もしもし。", "もう家に着いた？", "駅の近くに来たら教えて。", "人のいる場所にいてね。", "このまま話しているよ。", "中に入ったら連絡して。"],
+      zh: ["喂。", "你到家了吗？", "快到车站附近时告诉我。", "待在有人的地方。", "我会一直和你说话。", "进屋后给我发消息。"],
+    },
+  },
+  {
+    id: "cafe",
+    avatar: "C",
+    name: "Cafe",
+    preview: {
+      en: "Your table is ready.",
+      ja: "お席の準備ができました。",
+      zh: "你的座位已经准备好了。",
+    },
+    messages: {
+      en: ["Hello.", "Your table is ready.", "You can come in now.", "The entrance is on the bright street.", "Take your time.", "We'll be here."],
+      ja: ["お電話ありがとうございます。", "お席の準備ができました。", "今からお入りいただけます。", "入口は明るい通り側です。", "ゆっくりで大丈夫です。", "お待ちしています。"],
+      zh: ["您好。", "你的座位已经准备好了。", "现在可以进来了。", "入口在明亮的街道一侧。", "慢慢来就好。", "我们在这里等你。"],
+    },
+  },
+];
+
+const safetyCallDelays = [
+  { value: "now", key: "safetyCallDelayNow", seconds: 0 },
+  { value: "10", key: "safetyCallDelay10", seconds: 10 },
+  { value: "30", key: "safetyCallDelay30", seconds: 30 },
+  { value: "60", key: "safetyCallDelay60", seconds: 60 },
+];
+
+const safeRouteProfiles = [
+  {
+    id: "fastest",
+    icon: "⚡",
+    titleKey: "safeRouteFastest",
+    labelKey: "safeRouteFastestLabel",
+    timeKey: "safeRouteFastestTime",
+    characteristics: ["safeRouteFastestChar1", "safeRouteFastestChar2"],
+    reasons: ["safeRouteFastestReason1", "safeRouteFastestReason2"],
+    tradeoffKey: "safeRouteFastestTradeoff",
+  },
+  {
+    id: "main",
+    icon: "🛣",
+    titleKey: "safeRouteMainRoads",
+    labelKey: "safeRouteMainRoadsLabel",
+    timeKey: "safeRouteMainRoadsTime",
+    characteristics: ["safeRouteMainRoadsChar1", "safeRouteMainRoadsChar2", "safeRouteMainRoadsChar3"],
+    reasons: ["safeRouteMainRoadsReason1", "safeRouteMainRoadsReason2", "safeRouteMainRoadsReason3", "safeRouteMainRoadsReason4"],
+    comfortPoints: ["safeRouteComfortConvenience", "safeRouteComfortStation", "safeRouteComfortCafe", "safeRouteComfortKoban"],
+    pick: true,
+  },
+  {
+    id: "convenient",
+    icon: "🏪",
+    titleKey: "safeRouteConvenient",
+    labelKey: "safeRouteConvenientLabel",
+    timeKey: "safeRouteConvenientTime",
+    characteristics: ["safeRouteConvenientChar1", "safeRouteConvenientChar2", "safeRouteConvenientChar3"],
+    reasons: ["safeRouteConvenientReason1", "safeRouteConvenientReason2", "safeRouteConvenientReason3"],
+    comfortPoints: ["safeRouteComfortConvenience", "safeRouteComfortStation", "safeRouteComfortKoban"],
+  },
+];
+
+function safetyCaller() {
+  return safetyCallCallers.find((caller) => caller.id === state.safetyCallCaller) || safetyCallCallers[0];
+}
+
+function safetyDelay() {
+  return safetyCallDelays.find((delay) => delay.value === state.safetyCallDelay) || safetyCallDelays[1];
+}
+
+function requestSafetyCallRender() {
+  safetyCallRender();
+}
+
+export function setSafetyCallRender(callback) {
+  safetyCallRender = typeof callback === "function" ? callback : () => {};
+}
+
+function clearCountdownTimer() {
+  if (countdownTimer) window.clearInterval(countdownTimer);
+  countdownTimer = null;
+}
+
+function clearConversationTimer() {
+  if (conversationTimer) window.clearInterval(conversationTimer);
+  conversationTimer = null;
+}
+
+function stopRingtone() {
+  if (ringtoneTimer) window.clearInterval(ringtoneTimer);
+  ringtoneTimer = null;
+}
+
+function clearSafetyCallTimers() {
+  clearCountdownTimer();
+  clearConversationTimer();
+  stopRingtone();
+}
+
+function ensureAudioContext() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  if (!audioContext) audioContext = new AudioContextClass();
+  if (audioContext.state === "suspended") audioContext.resume();
+  return audioContext;
+}
+
+function playSafetyTone() {
+  if (!state.safetyCallSoundOn) return;
+  const context = ensureAudioContext();
+  if (!context) return;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(660, context.currentTime);
+  oscillator.frequency.setValueAtTime(520, context.currentTime + 0.16);
+  gain.gain.setValueAtTime(0.0001, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.08, context.currentTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.34);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start();
+  oscillator.stop(context.currentTime + 0.36);
+}
+
+function startRingtone() {
+  stopRingtone();
+  if (!state.safetyCallSoundOn) return;
+  playSafetyTone();
+  ringtoneTimer = window.setInterval(playSafetyTone, 1400);
+}
+
+function enterIncomingCall() {
+  clearCountdownTimer();
+  state.safetyCallStep = "incoming";
+  state.safetyCallRemaining = 0;
+  state.safetyCallVisibleMessages = 0;
+  startRingtone();
+  requestSafetyCallRender();
+}
+
+export function openSafetyCall() {
+  clearSafetyCallTimers();
+  state.selectedSafe = "";
+  state.safetyCallStep = "caller";
+  state.safetyCallCaller = state.safetyCallCaller || "anna";
+  state.safetyCallDelay = state.safetyCallDelay || "10";
+  state.safetyCallRemaining = safetyDelay().seconds;
+  state.safetyCallVisibleMessages = 0;
+  requestSafetyCallRender();
+}
+
+export function setSafetyCallCaller(callerId) {
+  state.safetyCallCaller = safetyCallCallers.some((caller) => caller.id === callerId) ? callerId : "anna";
+  requestSafetyCallRender();
+}
+
+export function setSafetyCallDelay(delayValue) {
+  state.safetyCallDelay = safetyCallDelays.some((delay) => delay.value === delayValue) ? delayValue : "10";
+  state.safetyCallRemaining = safetyDelay().seconds;
+  requestSafetyCallRender();
+}
+
+export function goToSafetyCallStep(step) {
+  if (!["intro", "caller", "delay"].includes(step)) return;
+  clearSafetyCallTimers();
+  state.safetyCallStep = step;
+  state.safetyCallVisibleMessages = 0;
+  requestSafetyCallRender();
+}
+
+export function toggleSafetyCallSound() {
+  state.safetyCallSoundOn = !state.safetyCallSoundOn;
+  if (!state.safetyCallSoundOn) {
+    stopRingtone();
+  } else if (state.safetyCallStep === "incoming") {
+    startRingtone();
+  } else {
+    ensureAudioContext();
+  }
+  requestSafetyCallRender();
+}
+
+export function startSafetyCallCountdown() {
+  clearSafetyCallTimers();
+  ensureAudioContext();
+  const delay = safetyDelay();
+  state.safetyCallRemaining = delay.seconds;
+  state.safetyCallVisibleMessages = 0;
+
+  if (delay.seconds === 0) {
+    enterIncomingCall();
+    return;
+  }
+
+  state.safetyCallStep = "countdown";
+  requestSafetyCallRender();
+  countdownTimer = window.setInterval(() => {
+    state.safetyCallRemaining = Math.max(0, Number(state.safetyCallRemaining) - 1);
+    if (state.safetyCallRemaining <= 0) {
+      enterIncomingCall();
+      return;
+    }
+    requestSafetyCallRender();
+  }, 1000);
+}
+
+export function cancelSafetyCall() {
+  clearSafetyCallTimers();
+  state.safetyCallStep = "intro";
+  state.safetyCallRemaining = safetyDelay().seconds;
+  state.safetyCallVisibleMessages = 0;
+  requestSafetyCallRender();
+}
+
+export function cancelSafetyCallCountdown() {
+  if (state.safetyCallStep !== "countdown") return false;
+  cancelSafetyCall();
+  return true;
+}
+
+export function acceptSafetyCall() {
+  stopRingtone();
+  clearConversationTimer();
+  state.safetyCallStep = "conversation";
+  state.safetyCallVisibleMessages = 1;
+  requestSafetyCallRender();
+  conversationTimer = window.setInterval(() => {
+    const messages = localize(safetyCaller().messages);
+    state.safetyCallVisibleMessages = Math.min(messages.length, state.safetyCallVisibleMessages + 1);
+    requestSafetyCallRender();
+    if (state.safetyCallVisibleMessages >= messages.length) clearConversationTimer();
+  }, 1700);
+}
+
+export function declineSafetyCall() {
+  clearSafetyCallTimers();
+  state.safetyCallStep = "finished";
+  state.safetyCallVisibleMessages = 0;
+  requestSafetyCallRender();
+}
+
+export function endSafetyCall() {
+  clearSafetyCallTimers();
+  state.safetyCallStep = "finished";
+  requestSafetyCallRender();
+}
+
+export function finishSafetyCall() {
+  clearSafetyCallTimers();
+  state.safetyCallStep = "intro";
+  state.selectedSafe = "";
+  state.safetyCallVisibleMessages = 0;
+  requestSafetyCallRender();
 }
 
 const safeScenarios = [
@@ -44,10 +348,9 @@ const safeScenarios = [
         mapQuery: { en: "Tokyo station convenience store police box", ja: "東京 駅 コンビニ 交番", zh: "东京 车站 便利店 派出所" },
       },
       {
-        label: { en: "Fake Call", ja: "フェイクコール", zh: "假电话" },
-        copy: { en: "Make it look like someone is waiting for you.", ja: "誰かが待っているように見せます。", zh: "让对方感觉有人在等你。" },
-        behavior: "page",
-        page: "fakeCall",
+        labelKey: "safetyCallTitle",
+        copyKey: "safetyCallShortExplanation",
+        behavior: "safetyCall",
       },
       {
         label: { en: "Find a public place", ja: "人のいる場所へ", zh: "去公共场所" },
@@ -213,6 +516,31 @@ function scenarioById(id = state.selectedSafe) {
   return safeScenarios.find((scenario) => scenario.id === id) || null;
 }
 
+function selectedRouteProfile() {
+  return safeRouteProfiles.find((profile) => profile.id === state.selectedSafeRoute) || safeRouteProfiles[1];
+}
+
+function safeRouteDirectionsUrl() {
+  const originCoordinates = state.safeRouteFromCoordinates || {};
+  const destinationCoordinates = state.safeRouteToCoordinates || {};
+  return buildGoogleMapsDirectionsUrl({
+    origin: state.safeRouteFrom,
+    originLat: originCoordinates.lat,
+    originLng: originCoordinates.lng,
+    destination: state.safeRouteTo,
+    destinationLat: destinationCoordinates.lat,
+    destinationLng: destinationCoordinates.lng,
+    travelMode: "walking",
+  });
+}
+
+function safeRouteSavedPlaces() {
+  const ids = [...new Set(state.savedPlaces || [])];
+  return ids
+    .map((id) => state.favoritePlaces.find((place) => place.id === id) || state.catalogs.places.find((place) => place.id === id))
+    .filter(Boolean);
+}
+
 function actionText(action, field) {
   const key = action[`${field}Key`];
   return key ? t(key) : localize(action[field]);
@@ -277,6 +605,7 @@ function renderAction(action, scenario) {
 
   const attrs = {
     page: action.behavior === "page" ? `data-safe-action-page="${action.page}"` : "",
+    safetyCall: action.behavior === "safetyCall" ? `data-safety-call-open` : "",
     communication: action.behavior === "communication" ? `data-safe-scroll-communication` : "",
     home: action.behavior === "home" ? `data-safe-home` : "",
     tip: action.behavior === "tip" ? `data-safe-action-tip="${escapeHtml(localize(action.tip))}"` : "",
@@ -353,6 +682,377 @@ function renderWhy(scenario) {
   `;
 }
 
+function routeInputError(errorKey) {
+  return errorKey ? `<p class="field-error" role="alert">${t(errorKey)}</p>` : "";
+}
+
+function routeLocationError() {
+  if (!state.safeRouteLocationError) return "";
+  return `
+    <p class="field-error safe-route-inline-message" role="alert">
+      ${t(state.safeRouteLocationError)} ${t("safeRouteEnterStartingPointInstead")}
+    </p>
+  `;
+}
+
+function renderSavedPlacesPicker() {
+  if (!state.safeRouteSavedPickerOpen) return "";
+  const savedPlaces = safeRouteSavedPlaces();
+  return `
+    <div class="surface safe-route-saved-picker" role="region" aria-label="${escapeHtml(t("safeRouteChooseSavedPlace"))}">
+      <p>${t("safeRouteChooseSavedPlace")}</p>
+      ${
+        savedPlaces.length
+          ? `<div class="safe-route-saved-list">
+              ${savedPlaces.map((place) => `
+                <button class="safe-route-saved-place" type="button" data-safe-route-saved-place="${escapeHtml(place.id)}">
+                  <span>
+                    <strong>${escapeHtml(place.name)}</strong>
+                    <small>${escapeHtml([place.category, place.area].filter(Boolean).join(" · "))}</small>
+                  </span>
+                  <span>${t("safeRouteUseThisPlace")}</span>
+                </button>
+              `).join("")}
+            </div>`
+          : `<p class="safe-route-empty-copy">${t("safeRouteNoSavedPlaces")}</p>`
+      }
+    </div>
+  `;
+}
+
+function renderRouteOption(profile) {
+  const selected = profile.id === selectedRouteProfile().id;
+  return `
+    <button class="surface safe-route-option ${selected ? "is-selected" : ""}" type="button" data-safe-route-option="${escapeHtml(profile.id)}" aria-pressed="${selected}">
+      <span class="safe-route-option-icon" aria-hidden="true">${escapeHtml(profile.icon)}</span>
+      <span class="safe-route-option-copy">
+        <span class="safe-route-option-head">
+          <strong>${t(profile.titleKey)}</strong>
+          ${profile.pick ? `<span class="prototype-badge safe-route-pick">${t("safeRoutePick")}</span>` : ""}
+        </span>
+        <small>${t(profile.labelKey)}</small>
+      </span>
+      <span class="safe-route-time">${t(profile.timeKey)}</span>
+      <span class="safe-route-characteristics">
+        ${profile.characteristics.map((key) => `<span>${t(key)}</span>`).join("")}
+      </span>
+    </button>
+  `;
+}
+
+function renderComfortPoints(profile) {
+  if (!profile.comfortPoints?.length) return "";
+  return `
+    <section class="safe-route-comfort">
+      <h4>${t("safeRouteAlongTheWay")}</h4>
+      <p>${t("safeRouteComfortCopy")}</p>
+      <div class="tag-row">
+        ${profile.comfortPoints.map((key) => `<span class="tag">${t(key)}</span>`).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderRoutePreview(profile) {
+  return `
+    <aside class="surface safe-route-preview" aria-label="${escapeHtml(t("safeRoutePreviewTitle"))}">
+      <span class="prototype-badge">${t("mapsPrototypeMap")}</span>
+      <h4>${t("safeRoutePreviewTitle")}</h4>
+      <div class="safe-route-preview-line is-${escapeHtml(profile.id)}" aria-hidden="true">
+        <span>${t("safeRouteFrom")}</span>
+        <i></i>
+        <span>${t("safeRouteTo")}</span>
+      </div>
+      <p>${t("safeRoutePreviewCopy")}</p>
+    </aside>
+  `;
+}
+
+function renderRouteDetail() {
+  const profile = selectedRouteProfile();
+  const mapsUrl = safeRouteDirectionsUrl();
+  return `
+    <section class="safe-route-detail-grid">
+      <article class="surface safe-route-detail" id="safeRouteDetail" aria-live="polite">
+        <div class="safe-route-detail-head">
+          <div>
+            <p class="eyebrow">${t("safeRouteSelectedRoute")}</p>
+            <h3>${t(profile.titleKey)}</h3>
+          </div>
+          <span class="safe-route-time is-large">${t(profile.timeKey)}</span>
+        </div>
+        <div>
+          <h4>${t("safeRouteWhyChoose")}</h4>
+          <ul class="safe-route-checklist">
+            ${profile.reasons.map((key) => `<li><span aria-hidden="true">✓</span>${t(key)}</li>`).join("")}
+          </ul>
+        </div>
+        ${profile.tradeoffKey ? `
+          <div class="safe-route-tradeoff">
+            <strong>${t("safeRouteTradeoff")}</strong>
+            <p>${t(profile.tradeoffKey)}</p>
+          </div>
+        ` : ""}
+        ${renderComfortPoints(profile)}
+        <div class="safe-route-handoff">
+          <p>${t("safeRouteGoogleHandoffNote")}</p>
+          ${mapsUrl
+            ? `<a class="button" href="${escapeHtml(mapsUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${t("safeRouteContinueMaps")}. ${t("mapsOpensExternal")}`)}">${t("safeRouteContinueMaps")}</a>`
+            : `<button class="button" type="button" disabled>${t("safeRouteContinueMaps")}</button>`}
+        </div>
+        <p class="safe-route-closing">${t("safeRouteClosingNote")}</p>
+      </article>
+      ${renderRoutePreview(profile)}
+    </section>
+  `;
+}
+
+function renderSafeRoute() {
+  const fromValue = state.safeRouteFromSource === "currentLocation" ? t("safeRouteCurrentLocation") : state.safeRouteFrom;
+  return `
+    <div class="safe-detail-v1 safe-route-view">
+      <button class="text-button safe-back-button" type="button" data-safe-home>${t("safeBack")}</button>
+      <section class="surface safe-route-head">
+        <div>
+          <p class="eyebrow">${t("safeHeroTitle")}</p>
+          <h1 class="section-title">${t("safeRouteTitle")}</h1>
+          <p class="section-copy">${t("safeRouteSubtitle")}</p>
+        </div>
+        <p class="safe-route-disclosure">${t("safeRoutePrototypeDisclosure")}</p>
+      </section>
+
+      <form class="surface safe-route-form" data-safe-route-form novalidate>
+        <div class="safe-route-fields">
+          <div class="safe-route-field-group">
+            <label class="field">
+              <span>${t("safeRouteFrom")}</span>
+              <input name="safeRouteFrom" data-safe-route-input="from" value="${escapeHtml(fromValue)}" placeholder="${escapeHtml(t("safeRouteFromPlaceholder"))}" autocomplete="street-address" />
+              ${routeInputError(state.safeRouteFromError)}
+            </label>
+            <div class="safe-route-quick-actions">
+              <button class="soft-button" type="button" data-safe-route-current-location aria-label="${escapeHtml(t("safeRouteUseCurrentLocation"))}" ${state.safeRouteLocationStatus === "loading" ? "disabled" : ""}>
+                <span aria-hidden="true">📍</span>
+                ${state.safeRouteLocationStatus === "loading" ? t("safeRouteUseCurrentLocation") : t("safeRouteCurrentLocation")}
+              </button>
+            </div>
+            ${routeLocationError()}
+          </div>
+          <div class="safe-route-field-group">
+            <label class="field">
+              <span>${t("safeRouteTo")}</span>
+              <input name="safeRouteTo" data-safe-route-input="to" value="${escapeHtml(state.safeRouteTo)}" placeholder="${escapeHtml(t("safeRouteToPlaceholder"))}" autocomplete="street-address" />
+              ${routeInputError(state.safeRouteToError)}
+            </label>
+            <div class="safe-route-quick-actions">
+              <button class="soft-button" type="button" data-safe-route-saved-toggle aria-expanded="${state.safeRouteSavedPickerOpen}" aria-controls="safeRouteSavedPicker">
+                <span aria-hidden="true">♡</span>
+                ${t("safeRouteSavedPlaces")}
+              </button>
+            </div>
+            <div id="safeRouteSavedPicker">
+              ${renderSavedPlacesPicker()}
+            </div>
+          </div>
+        </div>
+        <button class="button" type="submit">${t("safeRouteFindRoutes")}</button>
+      </form>
+
+      ${state.safeRouteHasResults ? `
+        <section class="safe-route-results">
+          <div class="section-head places-subhead">
+            <div>
+              <p class="eyebrow">${t("safeRouteChooseEyebrow")}</p>
+              <h3>${t("safeRouteChooseRoute")}</h3>
+              <p>${t("safeRouteChooseCopy")}</p>
+            </div>
+          </div>
+          <div class="safe-route-options" role="radiogroup" aria-label="${escapeHtml(t("safeRouteChooseRoute"))}">
+            ${safeRouteProfiles.map(renderRouteOption).join("")}
+          </div>
+          ${renderRouteDetail()}
+        </section>
+      ` : `
+        <section class="surface safe-route-empty-state">
+          <h3>${t("safeRouteBeforeResultsTitle")}</h3>
+          <p>${t("safeRouteBeforeResultsCopy")}</p>
+        </section>
+      `}
+    </div>
+  `;
+}
+
+function countdownLabel() {
+  const seconds = Math.max(0, Number(state.safetyCallRemaining) || 0);
+  const minutes = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const remainingSeconds = String(seconds % 60).padStart(2, "0");
+  return `${minutes}:${remainingSeconds}`;
+}
+
+function renderSafetyCallIntro() {
+  return `
+    <div class="safety-call-intro">
+      <div>
+        <p class="eyebrow">${t("safetyCallTitle")}</p>
+        <h2>${t("safetyCallFeelingTitle")}</h2>
+        <p>${t("safetyCallFeelingCopy")}</p>
+        <p class="safety-call-note">${t("safetyCallShortExplanation")}</p>
+      </div>
+      <div class="safety-call-actions">
+        <button class="button" type="button" data-safety-call-open>${t("safetyCallStart")}</button>
+        <div class="safety-call-secondary">
+          <button class="soft-button" type="button" data-safe-route-open>${t("safetyCallOpenSafeRoute")}</button>
+          <button class="soft-button" type="button" data-safe-scenario-guide>${t("safetyCallScenarioGuide")}</button>
+          <button class="soft-button" type="button" data-safety-call-emergency-phrases="${escapeHtml(t("safetyCallEmergencyPhraseText"))}">${t("safetyCallEmergencyPhrases")}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderSafetyCallCallerChoice() {
+  const caller = safetyCaller();
+  return `
+    <div class="safety-call-stage">
+      <div>
+        <p class="eyebrow">${t("safetyCallTitle")}</p>
+        <h2>${t("safetyCallChooseCaller")}</h2>
+        <p>${t("safetyCallChooseCallerCopy")}</p>
+      </div>
+      <div class="safety-caller-grid" role="radiogroup" aria-label="${escapeHtml(t("safetyCallChooseCaller"))}">
+        ${safetyCallCallers.map((item) => `
+          <button class="safety-caller-card ${item.id === caller.id ? "is-selected" : ""}" type="button" data-safety-call-caller="${escapeHtml(item.id)}" aria-pressed="${item.id === caller.id}">
+            <span class="safety-caller-avatar" aria-hidden="true">${escapeHtml(item.avatar)}</span>
+            <span>
+              <strong>${escapeHtml(item.name)}</strong>
+              <small>${escapeHtml(localize(item.preview))}</small>
+            </span>
+          </button>
+        `).join("")}
+      </div>
+      <div class="safety-call-footer">
+        <button class="text-button" type="button" data-safety-call-step="intro">${t("safetyCallBack")}</button>
+        <button class="button" type="button" data-safety-call-step="delay">${t("safetyCallContinue")}</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderSafetyCallDelayChoice() {
+  const delay = safetyDelay();
+  return `
+    <div class="safety-call-stage">
+      <div>
+        <p class="eyebrow">${t("safetyCallTitle")}</p>
+        <h2>${t("safetyCallChooseDelay")}</h2>
+        <p>${t("safetyCallChooseDelayCopy")}</p>
+        <p class="safety-call-note">${t("safetyCallDefaultDelay")}</p>
+      </div>
+      <div class="safety-delay-grid" role="radiogroup" aria-label="${escapeHtml(t("safetyCallChooseDelay"))}">
+        ${safetyCallDelays.map((item) => `
+          <button class="safety-delay-button ${item.value === delay.value ? "is-selected" : ""}" type="button" data-safety-call-delay="${escapeHtml(item.value)}" aria-pressed="${item.value === delay.value}">
+            ${t(item.key)}
+          </button>
+        `).join("")}
+      </div>
+      <div class="safety-call-footer">
+        <button class="soft-button" type="button" data-safety-call-sound aria-pressed="${state.safetyCallSoundOn}">
+          ${state.safetyCallSoundOn ? t("safetyCallSoundOn") : t("safetyCallSoundOff")}
+        </button>
+        <button class="text-button" type="button" data-safety-call-step="caller">${t("safetyCallBack")}</button>
+        <button class="button" type="button" data-safety-call-begin>${t("safetyCallStart")}</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderSafetyCallCountdown() {
+  return `
+    <div class="safety-call-stage safety-call-centered" aria-live="polite">
+      <p class="eyebrow">${t("safetyCallTitle")}</p>
+      <h2>${t("safetyCallPreparing")}</h2>
+      <div class="safety-countdown">${countdownLabel()}</div>
+      <button class="soft-button" type="button" data-safety-call-cancel>${t("safetyCallCancel")}</button>
+    </div>
+  `;
+}
+
+function renderSafetyCallIncoming() {
+  const caller = safetyCaller();
+  return `
+    <div class="safety-call-stage safety-call-centered">
+      <p class="eyebrow">${t("safetyCallIncoming")}</p>
+      <div class="safety-incoming-orb" aria-hidden="true">${escapeHtml(caller.avatar)}</div>
+      <h2>${escapeHtml(caller.name)}</h2>
+      <p>${t("safetyCallRingingCopy")}</p>
+      <div class="safety-call-footer is-centered">
+        <button class="soft-button" type="button" data-safety-call-decline>${t("safetyCallDecline")}</button>
+        <button class="button" type="button" data-safety-call-accept>${t("safetyCallAccept")}</button>
+      </div>
+      <button class="text-button" type="button" data-safety-call-sound aria-pressed="${state.safetyCallSoundOn}">
+        ${state.safetyCallSoundOn ? t("safetyCallSoundOn") : t("safetyCallSoundOff")}
+      </button>
+    </div>
+  `;
+}
+
+function renderSafetyCallConversation() {
+  const caller = safetyCaller();
+  const messages = localize(caller.messages);
+  const visibleMessages = messages.slice(0, Math.max(1, state.safetyCallVisibleMessages));
+  return `
+    <div class="safety-call-stage">
+      <div>
+        <p class="eyebrow">${t("safetyCallConversation")}</p>
+        <h2>${escapeHtml(caller.name)}</h2>
+      </div>
+      <div class="safety-message-list" aria-live="polite">
+        ${visibleMessages.map((message) => `
+          <div class="safety-message">
+            <strong>${escapeHtml(caller.name)}</strong>
+            <span>${escapeHtml(message)}</span>
+          </div>
+        `).join("")}
+      </div>
+      <div class="safety-call-footer">
+        <button class="button" type="button" data-safety-call-end>${t("safetyCallEnd")}</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderSafetyCallFinished() {
+  return `
+    <div class="safety-call-stage safety-call-centered">
+      <p class="eyebrow">${t("safetyCallTitle")}</p>
+      <h2>${t("safetyCallFinishedTitle")}</h2>
+      <p>${t("safetyCallFinishedCopy")}</p>
+      <div class="safety-call-footer is-centered">
+        <button class="soft-button" type="button" data-safe-route-open>${t("safetyCallOpenSafeRoute")}</button>
+        <button class="button" type="button" data-safety-call-done>${t("safetyCallDone")}</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderSafetyCall() {
+  const step = state.safetyCallStep || "intro";
+  const content = {
+    intro: renderSafetyCallIntro,
+    caller: renderSafetyCallCallerChoice,
+    delay: renderSafetyCallDelayChoice,
+    countdown: renderSafetyCallCountdown,
+    incoming: renderSafetyCallIncoming,
+    conversation: renderSafetyCallConversation,
+    finished: renderSafetyCallFinished,
+  }[step]?.() || renderSafetyCallIntro();
+
+  return `
+    <section id="safetyCall" class="surface safety-call-panel safety-call-${escapeHtml(step)}" aria-label="${escapeHtml(t("safetyCallTitle"))}">
+      ${content}
+    </section>
+  `;
+}
+
 function renderScenarioHome() {
   return `
     <section class="safe-v1-hero">
@@ -366,7 +1066,8 @@ function renderScenarioHome() {
         <img src="${ASSET_ROOT}nightwalk.png" alt="" />
       </div>
     </section>
-    <div class="safe-scenario-grid">
+    ${renderSafetyCall()}
+    <div id="safeScenarioGuide" class="safe-scenario-grid">
       ${safeScenarios.map((scenario) => `
         <button class="surface safe-scenario-card ${scenario.emergency ? "is-emergency" : ""}" type="button" data-safe="${scenario.id}">
           <span class="safe-scenario-icon ${scenario.emergency ? "is-emergency" : ""}">${safeIconSvg(scenario.id)}</span>
@@ -415,6 +1116,9 @@ function renderScenarioDetail(scenario) {
 }
 
 export function renderSafe() {
+  if (state.selectedSafe === "route") {
+    return pageShell(renderSafeRoute(), "safe-v1-page");
+  }
   const selected = scenarioById();
   return pageShell(selected ? renderScenarioDetail(selected) : renderScenarioHome(), "safe-v1-page");
 }

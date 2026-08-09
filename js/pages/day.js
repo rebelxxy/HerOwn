@@ -1,18 +1,25 @@
-import { state, PICTURE_ROOT } from '../state.js';
+import { state } from '../state.js';
 import { areas, budgets, dayRules, daySuggestions } from '../data.js';
-import { t } from '../i18n.js';
+import { t, tf } from '../i18n.js';
 import { pageShell } from '../components/layout.js';
 import { choiceChip } from '../components/cards.js';
 import { ensureDayPlanIdentity, hasSavedDayPlan } from '../storage.js';
 import { buildGoogleMapsDirectionsUrl, buildGoogleMapsLocationUrl } from '../utils/maps.js';
 
 export const dayDurationOptions = [
-  { label: "2 Hours", value: "2h" },
-  { label: "Half Day", value: "Half day" },
-  { label: "Full Day", value: "Full day" },
+  { labelKey: "dayDurationTwoHours", value: "2h" },
+  { labelKey: "dayDurationHalfDay", value: "Half day" },
+  { labelKey: "dayDurationFullDay", value: "Full day" },
 ];
 
 export const dayPreferences = ["Indoor first", "Less walking", "Calm and slow", "Try something new"];
+
+const dayPreferenceLabelKeys = {
+  "Indoor first": "dayPreferenceIndoorFirst",
+  "Less walking": "dayPreferenceLessWalking",
+  "Calm and slow": "dayPreferenceCalmSlow",
+  "Try something new": "dayPreferenceTryNew",
+};
 
 const durationStopCounts = {
   "2h": 2,
@@ -31,11 +38,16 @@ const calmCategories = ["Cafe", "Bookstore", "Flower Shop", "Park", "Museum"];
 const exploratoryCategories = ["Museum", "Gym", "Clinic", "Solo Restaurant", "Night Walk Spot", "Park"];
 
 export function displayDuration(value) {
-  return dayDurationOptions.find((option) => option.value === value)?.label || value;
+  const option = dayDurationOptions.find((item) => item.value === value);
+  return option ? t(option.labelKey) : value;
 }
 
 export function normalizeDuration(value) {
-  return dayDurationOptions.find((option) => option.label === value || option.value === value)?.value || value;
+  return dayDurationOptions.find((option) => t(option.labelKey) === value || option.value === value)?.value || value;
+}
+
+function displayPreference(value) {
+  return t(dayPreferenceLabelKeys[value]) || value;
 }
 
 function toMinutes(time) {
@@ -73,7 +85,11 @@ function placeBudgetScore(place) {
 
 function stopDescription(place, type) {
   if (place?.reason) return place.reason;
-  return `A ${type.toLowerCase()} stop that fits ${state.dayPreference.toLowerCase()} in ${state.dayArea}.`;
+  return tf("dayFallbackStopDescription", {
+    type,
+    preference: displayPreference(state.dayPreference),
+    area: state.dayArea,
+  });
 }
 
 function normalizeStop(stop) {
@@ -182,7 +198,7 @@ function escapeHtml(value) {
 
 function renderStopMapAction(stop) {
   const point = mapPointForStop(stop);
-  if (!point) return "";
+  if (!point) return `<span class="day-stop-map-unavailable">${t("dayStopMapUnavailable")}</span>`;
   return `
     <a class="text-button day-stop-map-link" href="${escapeHtml(point.url)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${t("mapsViewStopA11y")}: ${point.area || stop.title}. ${t("mapsOpensExternal")}`)}">
       ${t("mapsViewInMaps")} →
@@ -373,7 +389,7 @@ export function createDraftDayPlan() {
   }));
 
   return ensureDayPlanIdentity({
-    title: state.currentDayDraft?.title || "My HER Day",
+    title: state.currentDayDraft?.title || t("dayDefaultDraftTitle"),
     sourceSuggestionId: "current-draft",
     mood: state.dayMood,
     area: state.currentDayDraft?.area || state.dayArea,
@@ -421,10 +437,10 @@ function suggestionCard(suggestion) {
         <span class="pill">${displayDuration(suggestion.duration)}</span>
         <span class="pill">${suggestion.budget}</span>
       </div>
-      <div class="suggestion-includes" aria-label="Included place types">
+      <div class="suggestion-includes" aria-label="${t("dayIncludedPlaceTypes")}">
         ${suggestion.includes.map((type) => `<span>${type}</span>`).join("")}
       </div>
-      <strong class="suggestion-card-action">View plan →</strong>
+      <strong class="suggestion-card-action">${t("dayViewPlan")} →</strong>
     </button>
   `;
 }
@@ -434,10 +450,10 @@ function renderSuggestionList() {
     <section class="day-suggestions-section">
       <div class="section-head places-subhead">
         <div>
-          <p class="eyebrow">Today's Suggestions</p>
-          <h3>Choose the shape of your day.</h3>
+          <p class="eyebrow">${t("dayTodaysSuggestions")}</p>
+          <h3>${t("daySuggestionsHeading")}</h3>
         </div>
-        <button class="soft-button" type="button" data-create-my-day>✨ Create My Day</button>
+        <button class="soft-button" type="button" data-create-my-day>${t("dayCreateMyDay")}</button>
       </div>
       <div class="her-day-suggestion-grid">
         ${daySuggestions.map(suggestionCard).join("")}
@@ -450,45 +466,45 @@ function renderAdjustPanel() {
   if (!state.dayAdjustOpen) return "";
 
   return `
-    <section class="day-adjust-panel" aria-label="Adjust this HER Day">
+    <section class="day-adjust-panel" aria-label="${t("dayAdjustThisDay")}">
       <div class="day-adjust-header">
         <div>
-          <p class="eyebrow">Adjust this day</p>
-          <h3>Make it fit your pace.</h3>
+          <p class="eyebrow">${t("dayAdjustThisDay")}</p>
+          <h3>${t("dayAdjustHeading")}</h3>
         </div>
-        <button class="text-button" type="button" data-toggle-day-adjust>Close</button>
+        <button class="text-button" type="button" data-toggle-day-adjust>${t("dayClose")}</button>
       </div>
       <div class="day-adjust-grid">
         <div class="field day-start-field">
-          <label for="dayStartTime">Start time</label>
+          <label for="dayStartTime">${t("dayStartTime")}</label>
           <input id="dayStartTime" type="time" value="${state.dayStartTime}" data-day-start-time />
         </div>
         <fieldset class="day-adjust-group">
-          <legend>Duration</legend>
+          <legend>${t("dayDuration")}</legend>
           <div class="choice-grid">
-            ${dayDurationOptions.map((option) => choiceChip(option.label, normalizeDuration(state.dayTime) === option.value, `data-adjust-day-time="${option.value}"`)).join("")}
+            ${dayDurationOptions.map((option) => choiceChip(t(option.labelKey), normalizeDuration(state.dayTime) === option.value, `data-adjust-day-time="${option.value}"`)).join("")}
           </div>
         </fieldset>
         <fieldset class="day-adjust-group">
-          <legend>Budget</legend>
+          <legend>${t("dayBudget")}</legend>
           <div class="choice-grid">
             ${budgets.map((budget) => choiceChip(budget, state.dayBudget === budget, `data-adjust-day-budget="${budget}"`)).join("")}
           </div>
         </fieldset>
         <fieldset class="day-adjust-group">
-          <legend>Area</legend>
+          <legend>${t("dayArea")}</legend>
           <div class="choice-grid">
             ${areas.map((area) => choiceChip(area, state.dayArea === area, `data-adjust-day-area="${area}"`)).join("")}
           </div>
         </fieldset>
         <fieldset class="day-adjust-group wide">
-          <legend>Preference</legend>
+          <legend>${t("dayPreference")}</legend>
           <div class="choice-grid">
-            ${dayPreferences.map((preference) => choiceChip(preference, state.dayPreference === preference, `data-adjust-day-preference="${preference}"`)).join("")}
+            ${dayPreferences.map((preference) => choiceChip(displayPreference(preference), state.dayPreference === preference, `data-adjust-day-preference="${preference}"`)).join("")}
           </div>
         </fieldset>
       </div>
-      <button class="button" type="button" data-apply-day-adjust>Apply Changes</button>
+      <button class="button" type="button" data-apply-day-adjust>${t("dayApplyChanges")}</button>
     </section>
   `;
 }
@@ -498,7 +514,7 @@ function renderStopActions(stop, index, planLength) {
   return `
     <div class="day-stop-actions">
       <details class="replace-picker">
-        <summary>Replace</summary>
+        <summary>${t("dayReplace")}</summary>
         <div class="replace-options">
           ${
             replacements.length
@@ -512,21 +528,64 @@ function renderStopActions(stop, index, planLength) {
                   `
                 )
                 .join("")
-              : `<span class="section-copy">No local replacement yet.</span>`
+              : `<span class="section-copy">${t("dayNoReplacement")}</span>`
           }
         </div>
       </details>
-      <button type="button" data-day-move-up="${index}" ${index === 0 ? "disabled" : ""}>Move up</button>
-      <button type="button" data-day-move-down="${index}" ${index === planLength - 1 ? "disabled" : ""}>Move down</button>
-      <button type="button" data-day-remove-stop="${index}" ${planLength <= 1 ? "disabled" : ""}>Remove</button>
+      <details class="day-more-actions">
+        <summary>${t("dayMoreActions")}</summary>
+        <div class="day-more-menu">
+          <button type="button" data-day-move-up="${index}" ${index === 0 ? `disabled title="${t("dayActionUnavailable")}"` : ""}>${t("dayMoveUp")}</button>
+          <button type="button" data-day-move-down="${index}" ${index === planLength - 1 ? `disabled title="${t("dayActionUnavailable")}"` : ""}>${t("dayMoveDown")}</button>
+          <button class="is-destructive-text" type="button" data-day-remove-stop="${index}" ${planLength <= 1 ? `disabled title="${t("dayActionUnavailable")}"` : ""}>${t("dayRemove")}</button>
+          ${planLength <= 1 ? `<span class="day-action-note">${t("dayOneStopActionNote")}</span>` : ""}
+        </div>
+      </details>
     </div>
+  `;
+}
+
+function renderOpenRouteAction(routeUrl) {
+  if (!routeUrl) return "";
+  return `
+    <a class="soft-button route-map-link" href="${escapeHtml(routeUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${t("mapsOpenRouteA11y")}. ${t("mapsOpensExternal")}`)}">
+      ${t("mapsOpenRouteInMaps")}
+    </a>
+  `;
+}
+
+function renderRouteOverview(plan, routeUrl) {
+  const mappedCount = plan.map((stop) => mapPointForStop(stop)).filter(Boolean).length;
+  const routeMessage = !routeUrl
+    ? `<p class="route-overview-message">${mappedCount < 2 ? t("dayAddMappedStopForRoute") : t("dayNoRouteAvailable")}</p>`
+    : "";
+
+  return `
+    <aside class="surface route-overview" aria-label="${t("dayRouteOverview")}">
+      <p class="eyebrow">${t("dayRouteOverview")}</p>
+      <h3>${t("dayRouteOverviewHeading")}</h3>
+      ${
+        plan.length
+          ? `
+            <ol class="route-summary-list">
+              ${plan.map((stop) => `
+                <li>
+                  <time>${escapeHtml(stop.time)}</time>
+                  <span>${escapeHtml(stop.title)}</span>
+                </li>
+              `).join("")}
+            </ol>
+          `
+          : `<p class="route-overview-message">${t("dayNoRouteAvailable")}</p>`
+      }
+      ${routeMessage}
+    </aside>
   `;
 }
 
 function renderSuggestionDetail(suggestion) {
   const plan = getDayPlan();
   const includedTypes = [...new Set(plan.map((stop) => stop.type))];
-  const routeText = `Route placeholder: ${plan.map((stop) => stop.title).join(" → ")}.`;
   const routeUrl = routeUrlForPlan(plan);
   const currentPlan = createCurrentDayPlan(suggestion);
   const isSaved = hasSavedDayPlan(state.savedDays, currentPlan);
@@ -541,15 +600,15 @@ function renderSuggestionDetail(suggestion) {
           <div class="suggestion-meta">
             <span class="pill">${displayDuration(state.dayTime)}</span>
             <span class="pill">${state.dayBudget}</span>
-            <span class="pill">${state.dayPreference}</span>
+            <span class="pill">${displayPreference(state.dayPreference)}</span>
             ${includedTypes.map((type) => `<span class="tag">${type}</span>`).join("")}
           </div>
         </div>
 
         <div class="section-head places-subhead">
           <div>
-            <p class="eyebrow">Today's Plan</p>
-            <h3>${plan.length} gentle stops, in order.</h3>
+            <p class="eyebrow">${t("dayTodaysPlan")}</p>
+            <h3>${tf("dayGentleStopsInOrder", { count: plan.length })}</h3>
           </div>
         </div>
 
@@ -573,32 +632,20 @@ function renderSuggestionDetail(suggestion) {
         </div>
 
         <div class="day-stop-footer">
-          <button class="soft-button" type="button" data-add-day-stop>Add a stop</button>
+          <button class="soft-button" type="button" data-add-day-stop>${t("dayAddStop")}</button>
         </div>
 
         ${renderAdjustPanel()}
 
         <div class="day-detail-actions">
-          <button class="button" type="button" data-start-route="${suggestion.id}">Start Route</button>
-          <button class="soft-button ${isSaved ? "is-saved" : ""}" type="button" data-save-day-suggestion="${suggestion.id}" ${isSaved ? "disabled aria-disabled=\"true\"" : ""}>${isSaved ? "Saved" : "Save to My Days"}</button>
-          <button class="text-button" type="button" data-toggle-day-adjust>Adjust this Day</button>
-          <button class="text-button" type="button" data-day-back>Back to Suggestions</button>
+          <button class="button ${isSaved ? "is-saved" : ""}" type="button" data-save-day-suggestion="${suggestion.id}" ${isSaved ? "disabled aria-disabled=\"true\"" : ""}>${isSaved ? t("daySaved") : t("daySaveToMyDays")}</button>
+          ${renderOpenRouteAction(routeUrl)}
+          <button class="soft-button" type="button" data-toggle-day-adjust>${t("dayAdjustThisDay")}</button>
+          <button class="text-button" type="button" data-day-back>${t("dayBackToSuggestions")}</button>
         </div>
       </div>
 
-      <aside class="surface route-placeholder">
-        <p class="eyebrow">Route placeholder</p>
-        <h3>Map route will live here.</h3>
-        <p>${routeText}</p>
-        ${
-          routeUrl
-            ? `<a class="soft-button route-map-link" href="${escapeHtml(routeUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${t("mapsOpenRouteA11y")}. ${t("mapsOpensExternal")}`)}">${t("mapsOpenRouteInMaps")}</a>`
-            : ""
-        }
-        <div class="route-line" aria-hidden="true">
-          ${plan.map((stop) => `<span>${stop.time}</span>`).join("")}
-        </div>
-      </aside>
+      ${renderRouteOverview(plan, routeUrl)}
     </section>
   `;
 }
@@ -609,29 +656,28 @@ function renderCurrentDraft() {
 
   const plan = getDayPlan();
   const includedTypes = [...new Set(plan.map((stop) => stop.type))];
-  const routeText = `Route placeholder: ${plan.map((stop) => stop.title).join(" → ")}.`;
   const routeUrl = routeUrlForPlan(plan);
 
   return `
     <section class="day-detail-layout current-day-draft">
       <div class="surface">
         <div class="detail-heading">
-          <p class="eyebrow">Current Day Draft</p>
-          <h2>${draft.title || "My HER Day"}</h2>
-          <p class="section-copy">Places you added from HER Places are kept here until you save them to My Days.</p>
+          <p class="eyebrow">${t("dayCurrentDraft")}</p>
+          <h2>${draft.title || t("dayDefaultDraftTitle")}</h2>
+          <p class="section-copy">${t("dayCurrentDraftCopy")}</p>
           <div class="suggestion-meta">
             <span class="pill">${displayDuration(state.dayTime)}</span>
             <span class="pill">${state.dayBudget}</span>
             <span class="pill">${state.dayArea}</span>
-            <span class="pill">${state.dayPreference}</span>
+            <span class="pill">${displayPreference(state.dayPreference)}</span>
             ${includedTypes.map((type) => `<span class="tag">${type}</span>`).join("")}
           </div>
         </div>
 
         <div class="section-head places-subhead">
           <div>
-            <p class="eyebrow">Current stops</p>
-            <h3>${plan.length} stops in your draft.</h3>
+            <p class="eyebrow">${t("dayCurrentStops")}</p>
+            <h3>${tf("dayStopsInDraft", { count: plan.length })}</h3>
           </div>
         </div>
 
@@ -655,43 +701,31 @@ function renderCurrentDraft() {
         </div>
 
         <div class="day-stop-footer">
-          <button class="soft-button" type="button" data-add-day-stop>Add a stop</button>
+          <button class="soft-button" type="button" data-add-day-stop>${t("dayAddStop")}</button>
         </div>
 
         ${renderAdjustPanel()}
 
         <div class="day-detail-actions">
-          <button class="button" type="button" data-start-route="current-draft">Start Route</button>
-          <button class="soft-button" type="button" data-save-current-day-draft>Save to My Days</button>
-          <button class="text-button" type="button" data-toggle-day-adjust>Adjust this Day</button>
-          <button class="text-button" type="button" data-request-discard-day-draft>Discard Draft</button>
+          <button class="button" type="button" data-save-current-day-draft>${t("daySaveToMyDays")}</button>
+          ${renderOpenRouteAction(routeUrl)}
+          <button class="soft-button" type="button" data-toggle-day-adjust>${t("dayAdjustThisDay")}</button>
+          <button class="text-button is-destructive-text" type="button" data-request-discard-day-draft>${t("dayDiscardDraft")}</button>
         </div>
         ${
           state.pendingDiscardDayDraft
             ? `
               <div class="delete-confirm">
-                <span>Discard this HER Day draft?</span>
-                <button class="soft-button" type="button" data-confirm-discard-day-draft>Confirm</button>
-                <button class="text-button" type="button" data-cancel-discard-day-draft>Cancel</button>
+                <span>${t("dayDiscardConfirm")}</span>
+                <button class="soft-button" type="button" data-confirm-discard-day-draft>${t("dayConfirm")}</button>
+                <button class="text-button" type="button" data-cancel-discard-day-draft>${t("dayCancel")}</button>
               </div>
             `
             : ""
         }
       </div>
 
-      <aside class="surface route-placeholder">
-        <p class="eyebrow">Route placeholder</p>
-        <h3>Map route will live here.</h3>
-        <p>${routeText}</p>
-        ${
-          routeUrl
-            ? `<a class="soft-button route-map-link" href="${escapeHtml(routeUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${t("mapsOpenRouteA11y")}. ${t("mapsOpensExternal")}`)}">${t("mapsOpenRouteInMaps")}</a>`
-            : ""
-        }
-        <div class="route-line" aria-hidden="true">
-          ${plan.map((stop) => `<span>${stop.time}</span>`).join("")}
-        </div>
-      </aside>
+      ${renderRouteOverview(plan, routeUrl)}
     </section>
   `;
 }
@@ -706,8 +740,8 @@ export function renderDay() {
         <h1 class="section-title">${t("dayTitle")}</h1>
         <p class="section-copy">${t("daySubtitle")}</p>
       </div>
-      <img src="${PICTURE_ROOT}003_large_woman_writing_flowers.png" alt="" />
+      <img src="images/herday.png" alt="" />
     </div>
     ${state.currentDayDraft ? renderCurrentDraft() : selectedSuggestion ? renderSuggestionDetail(selectedSuggestion) : renderSuggestionList()}
-  `);
+  `, "day-page");
 }

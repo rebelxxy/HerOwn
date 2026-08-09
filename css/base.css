@@ -15,7 +15,7 @@
   --shadow: 0 22px 70px rgba(83, 58, 38, 0.14);
   --tight-shadow: 0 12px 32px rgba(83, 58, 38, 0.12);
   --radius: 8px;
-  --nav-height: 76px;
+  --nav-height: 72px;
 }
 
 * {
@@ -55,7 +55,7 @@ button {
 }
 
 .topbar {
-  position: fixed;
+  position: relative;
   z-index: 50;
   top: 0;
   left: 0;
@@ -163,7 +163,7 @@ button {
 
 main {
   min-height: 100vh;
-  padding-top: var(--nav-height);
+  padding-top: 0;
 }
 
 .hero {

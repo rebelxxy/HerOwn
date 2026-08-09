@@ -181,6 +181,7 @@ export function renderHome() {
         <div class="hero-copy home-hero-copy-v2">
           <p class="eyebrow">${t(greetingKey())}</p>
           <h1>${welcomeMarkup()}</h1>
+          <p class="home-confidence-line">${t("homeConfidenceLine")}</p>
           <p class="home-hero-question">${t("homeNeedToday")}</p>
         </div>
         <img class="hero-illustration" src="${ASSET_ROOT}hero.png" alt="" />
@@ -202,11 +203,8 @@ export function renderHome() {
           <p class="eyebrow">${t("homeBrandLabel")}</p>
           <blockquote>${t("homeBrandLine1")}<br />${t("homeBrandLine2")}</blockquote>
         </div>
-        <div class="home-brand-sketch" aria-hidden="true">
-          <span class="home-sketch-window"></span>
-          <span class="home-sketch-line"></span>
-          <span class="home-sketch-note home-sketch-note-room">${t("homeBrandRoom")}</span>
-          <span class="home-sketch-note home-sketch-note-city">${t("homeBrandCity")}</span>
+        <div class="home-brand-visual" aria-hidden="true">
+          <img src="${PICTURE_ROOT}0074.png" alt="" />
         </div>
       </section>
     </section>

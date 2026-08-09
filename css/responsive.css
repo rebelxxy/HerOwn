@@ -14,7 +14,8 @@
   .living-detail-view,
   .day-detail-layout,
   .day-head-product,
-  .living-head-product {
+  .living-head-product,
+  .places-head-product {
     grid-template-columns: 1fr;
   }
 
@@ -35,6 +36,8 @@
 
   .places-page .section-head,
   .places-page .section-head > div,
+  .places-page .places-head-product,
+  .places-page .places-head-product > div,
   .places-page .places-product,
   .places-page .places-filter-panel,
   .places-page .places-list-panel,
@@ -154,8 +157,16 @@
   }
 
   .day-head-product img,
-  .living-head-product img {
-    max-height: 210px;
+  .living-head-product img,
+  .places-head-product img {
+    justify-self: center;
+    max-height: 260px;
+  }
+
+  .day-head-product > div,
+  .living-head-product > div,
+  .places-head-product > div {
+    padding-left: 0;
   }
 }
 
@@ -163,8 +174,51 @@
 * { min-width: 0; }
 
 @media (max-width: 760px) {
+  body,
+  .app-frame,
+  main,
+  #app {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
   .topbar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
     gap: 8px;
+    width: 100vw;
+    max-width: 100vw;
+    min-width: 0;
+  }
+
+  main {
+    padding-top: var(--nav-height);
+  }
+
+  .main-nav {
+    position: fixed;
+    top: var(--nav-height);
+    left: 12px;
+    right: 12px;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: rgba(255, 250, 244, 0.98);
+    box-shadow: var(--shadow);
+  }
+
+  .main-nav.is-open {
+    display: flex;
+  }
+
+  .mobile-menu {
+    display: grid;
+    flex: 0 0 auto;
   }
 
   .brand {
@@ -172,6 +226,11 @@
   }
 
   .topbar-actions {
+    position: absolute;
+    top: 50%;
+    right: auto;
+    left: min(calc(100vw - 122px), 268px);
+    transform: translateY(-50%);
     gap: 6px;
     flex: 0 0 auto;
   }
@@ -231,6 +290,28 @@
     flex-direction: column;
   }
 
+  .day-page {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    margin-right: 12px;
+    margin-left: 12px;
+    padding-bottom: 96px;
+  }
+
+  .day-page .day-adjust-panel {
+    scroll-margin-block: 16px 96px;
+  }
+
+  .day-page .route-overview {
+    width: 100%;
+  }
+
+  .day-page .route-summary-list li {
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 12px;
+    padding-left: 20px;
+  }
+
   .her-day-stop {
     grid-template-columns: 62px minmax(0, 1fr);
   }
@@ -240,7 +321,8 @@
     justify-content: flex-start;
   }
 
-  .replace-options {
+  .replace-options,
+  .day-more-menu {
     position: static;
     width: 100%;
     margin-top: 8px;
@@ -365,6 +447,9 @@
   .places-mvp-layout,
   .places-detail-grid,
   .safe-action-v1-grid,
+  .safe-route-head,
+  .safe-route-options,
+  .safe-route-detail-grid,
   .safe-why-panel {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -508,6 +593,12 @@
   .safe-hero-visual {
     min-height: clamp(300px, 52vw, 480px);
   }
+
+  .safety-call-intro,
+  .safety-caller-grid,
+  .safety-delay-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -551,6 +642,11 @@
   .home-hero-question {
     margin-top: 2px;
     font-size: clamp(22px, 7vw, 28px);
+  }
+
+  .home-confidence-line {
+    max-width: 100%;
+    font-size: 14px;
   }
 
   .home-hero-art {
@@ -618,6 +714,15 @@
     font-size: clamp(28px, 9vw, 38px);
   }
 
+  .home-brand-visual {
+    min-height: 190px;
+  }
+
+  .home-brand-visual img {
+    width: min(100%, 210px);
+    max-height: 240px;
+  }
+
   .home-brand-sketch {
     min-height: 158px;
   }
@@ -638,6 +743,11 @@
   .safe-v1-page {
     width: calc(100vw - 24px);
     max-width: calc(100vw - 24px);
+    margin-right: 12px;
+    margin-left: 12px;
+    padding-right: 0;
+    padding-left: 0;
+    overflow-x: hidden;
   }
 
   .safe-v1-hero {
@@ -682,6 +792,125 @@
   .safe-hero-visual img {
     object-position: 58% center;
     transform: scale(1.01);
+  }
+
+  .safety-call-panel {
+    width: 100%;
+    max-width: 100%;
+    padding: 18px;
+  }
+
+  .safety-call-intro > div,
+  .safety-call-stage > div,
+  .safety-call-actions,
+  .safety-message-list {
+    width: 100%;
+    max-width: min(280px, calc(100vw - 88px));
+  }
+
+  .safety-call-intro h2,
+  .safety-call-intro p,
+  .safety-call-stage h2,
+  .safety-call-stage p,
+  .safety-call-note {
+    max-width: 100%;
+    word-break: normal;
+    overflow-wrap: break-word;
+  }
+
+  .safety-call-intro,
+  .safety-caller-grid,
+  .safety-delay-grid,
+  .safety-call-secondary {
+    grid-template-columns: 1fr;
+  }
+
+  .safety-caller-card {
+    min-height: 92px;
+  }
+
+  .safety-call-footer,
+  .safety-call-footer.is-centered {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .safety-call-footer .button,
+  .safety-call-footer .soft-button,
+  .safety-call-footer .text-button,
+  .safety-call-actions .button,
+  .safety-call-secondary .soft-button {
+    width: 100%;
+  }
+
+  .safety-countdown {
+    font-size: clamp(52px, 18vw, 74px);
+  }
+
+  .safety-incoming-orb {
+    width: 88px;
+    height: 88px;
+    font-size: 34px;
+  }
+
+  .safety-message {
+    max-width: 100%;
+  }
+
+  .safe-route-head,
+  .safe-route-form,
+  .safe-route-empty-state,
+  .safe-route-detail,
+  .safe-route-preview {
+    padding: 16px;
+  }
+
+  .safe-route-form,
+  .safe-route-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .safe-route-quick-actions,
+  .safe-route-quick-actions .soft-button {
+    width: 100%;
+  }
+
+  .safe-route-saved-place {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .safe-route-form .button,
+  .safe-route-handoff .button {
+    width: 100%;
+  }
+
+  .safe-route-disclosure {
+    padding-left: 10px;
+  }
+
+  .safe-route-option {
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .safe-route-detail-head {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .safe-route-time.is-large {
+    width: max-content;
+  }
+
+  .safe-route-preview-line {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  .safe-route-preview-line i {
+    width: 100%;
   }
 
   .safe-scenario-card {

@@ -1,7 +1,7 @@
 import { state, PICTURE_ROOT } from '../state.js';
 import { categoryIcons, categoryMap, placeCategories, placeExperienceFilters } from '../data.js';
 import { t } from '../i18n.js';
-import { pageShell, sectionHead } from '../components/layout.js';
+import { pageShell } from '../components/layout.js';
 import { filterChip } from '../components/cards.js';
 import { buildGoogleMapsLocationUrl } from '../utils/maps.js';
 
@@ -360,6 +360,7 @@ function detailPanel(selected) {
             ? `<button class="soft-button is-saved" type="button" disabled>Saved</button>`
             : `<button class="soft-button" type="button" data-save-place="${escapeHtml(selected.id)}">Save Place</button>`
         }
+        <button class="soft-button" type="button" data-open-safe-route-place="${escapeHtml(selected.id)}">${t("safetyCallOpenSafeRoute")}</button>
         ${
           addedToDraft
             ? `<button class="button is-saved" type="button" disabled>Added to HER Day</button>`
@@ -403,11 +404,15 @@ export function renderPlaces() {
   const noResultMessage = emptyMessage(rawQuery, hasSearch, hasCategoryLimit, activeExperiences);
 
   return pageShell(`
-    ${sectionHead(
-      "HER Places",
-      "Find places where you can comfortably be yourself.",
-      "Browse fictional prototype places by experience, category, or the kind of solo moment you want today."
-    )}
+    <div class="places-head-product">
+      <div>
+        <p class="eyebrow">${t("placesHeroEyebrow")}</p>
+        <h1 class="section-title">${t("placesTitle")}</h1>
+        <p class="section-copy">${t("placesHeroCopy")}</p>
+        <p class="product-hero-note">${t("placesHeroNote")}</p>
+      </div>
+      <img src="images/herplace.png" alt="" />
+    </div>
     <div class="places-product places-mvp">
       <form class="search-bar places-search" data-place-search-form>
         <input type="search" name="placeSearch" value="${escapeHtml(state.placeSearch)}" placeholder="Search by place, area, experience, or mood" aria-label="Search places" />

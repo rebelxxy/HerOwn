@@ -1,4 +1,5 @@
 import { state } from '../state.js';
+import { t } from '../i18n.js';
 import { pageShell, sectionHead } from '../components/layout.js';
 import { categoryButton, listRow } from '../components/cards.js';
 
@@ -198,8 +199,8 @@ export function renderMy() {
     )}
     <div class="my-grid">
       <aside class="profile-panel">
-        <div class="profile-avatar line-avatar" aria-hidden="true"></div>
-        <h2>Hello, Her</h2>
+        <img class="profile-avatar profile-avatar-image" src="images/pictures/0074.png" alt="" />
+        <h2>${t("myTitle")}</h2>
         <p class="section-copy">${state.user.city} · ${state.user.language}</p>
         <div class="guide-meta">
           ${state.user.preferences.map((pref) => `<span class="tag">${pref}</span>`).join("")}
