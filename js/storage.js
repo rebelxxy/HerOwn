@@ -4,6 +4,7 @@ export const SAVED_GUIDES_KEY = "herOwnSavedGuides";
 export const LIVING_PROGRESS_KEY = "herOwnLivingStepProgress";
 export const SAVED_PLACES_KEY = "herOwnSavedPlaces";
 export const NOTES_KEY = "herOwnNotes";
+export const LOCATION_ENABLED_KEY = "herOwnLocationEnabled";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -332,6 +333,29 @@ export function persistNotes(notes) {
     storage.setItem(NOTES_KEY, JSON.stringify(normalized));
   } catch (error) {
     console.warn("Could not save HER OWN notes to localStorage.");
+  }
+
+  return normalized;
+}
+
+export function loadLocationEnabled() {
+  const storage = safeLocalStorage();
+  if (!storage) return true;
+
+  const value = storage.getItem(LOCATION_ENABLED_KEY);
+  if (value === null) return true;
+  return value === "true";
+}
+
+export function persistLocationEnabled(enabled) {
+  const storage = safeLocalStorage();
+  const normalized = Boolean(enabled);
+  if (!storage) return normalized;
+
+  try {
+    storage.setItem(LOCATION_ENABLED_KEY, String(normalized));
+  } catch (error) {
+    console.warn("Could not save location setting to localStorage.");
   }
 
   return normalized;

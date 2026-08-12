@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import { renderStaticText, t } from './i18n.js';
 import { saveDayPlan, saveFavoritePlace } from './api.js';
-import { clearCurrentDayDraft, hasSavedDayPlan, mergeDayPlans, persistCurrentDayDraft, persistLivingStepProgress, persistNotes, persistSavedDays, persistSavedGuides, persistSavedPlaces } from './storage.js';
+import { clearCurrentDayDraft, hasSavedDayPlan, mergeDayPlans, persistCurrentDayDraft, persistLivingStepProgress, persistLocationEnabled, persistNotes, persistSavedDays, persistSavedGuides, persistSavedPlaces } from './storage.js';
 import { renderAssistant } from './components/assistant.js';
 import { renderHome } from './pages/home.js';
 import {
@@ -834,7 +834,7 @@ function bindPageEvents() {
       const placeId = button.dataset.removeSavedPlace;
       state.savedPlaces = persistSavedPlaces(state.savedPlaces.filter((id) => id !== placeId));
       state.favoritePlaces = state.favoritePlaces.filter((place) => place.id !== placeId);
-      showToast("Removed");
+      showToast(t("myPlaceRemovedToast"));
       render();
     });
   });
@@ -922,7 +922,7 @@ function bindPageEvents() {
       const title = String(formData.get("noteTitle") || "").trim();
       const content = String(formData.get("noteContent") || "").trim();
       if (!title && !content) {
-        showToast("Write a title or note first");
+        showToast(t("myNoteValidationToast"));
         return;
       }
 
@@ -932,26 +932,26 @@ function bindPageEvents() {
           note.id === state.editingNoteId
             ? {
               ...note,
-              title: title || "Untitled note",
+              title: title || t("myUntitledNote"),
               content,
               updatedAt: now,
             }
             : note
         )));
         state.editingNoteId = "";
-        showToast("Note updated");
+        showToast(t("myNoteUpdatedToast"));
       } else {
         state.notes = persistNotes([
           {
             id: `note-${Date.now()}`,
-            title: title || "Untitled note",
+            title: title || t("myUntitledNote"),
             content,
             createdAt: now,
             updatedAt: now,
           },
           ...state.notes,
         ]);
-        showToast("Note added");
+        showToast(t("myNoteAddedToast"));
       }
       render();
     });
@@ -993,7 +993,7 @@ function bindPageEvents() {
       if (state.editingNoteId === noteId) state.editingNoteId = "";
       if (state.expandedNoteId === noteId) state.expandedNoteId = "";
       state.pendingDeleteNoteId = "";
-      showToast("Note deleted");
+      showToast(t("myNoteDeletedToast"));
       render();
     });
   });
@@ -1002,6 +1002,20 @@ function bindPageEvents() {
     button.addEventListener("click", () => {
       state.expandedNoteId = state.expandedNoteId === button.dataset.toggleNote ? "" : button.dataset.toggleNote;
       render();
+    });
+  });
+
+  app.querySelectorAll("[data-my-language]").forEach((select) => {
+    select.addEventListener("change", () => {
+      state.lang = select.value;
+      localStorage.setItem('herOwnLanguage', state.lang);
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-my-logout]").forEach((button) => {
+    button.addEventListener("click", () => {
+      showToast(t("myLogoutToast"));
     });
   });
 
@@ -1729,8 +1743,8 @@ function bindPageEvents() {
 
   app.querySelectorAll("[data-toggle-location]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.user.locationEnabled = !state.user.locationEnabled;
-      showToast(`Location ${state.user.locationEnabled ? "enabled" : "disabled"}`);
+      state.user.locationEnabled = persistLocationEnabled(!state.user.locationEnabled);
+      showToast(state.user.locationEnabled ? t("myLocationEnabledToast") : t("myLocationDisabledToast"));
       render();
     });
   });

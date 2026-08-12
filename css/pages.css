@@ -99,8 +99,7 @@
 }
 
 .mini-card:nth-child(1) .line-place-thumb,
-.place-pick:nth-child(1) .line-place-thumb,
-.saved-card:nth-child(1) .line-place-thumb {
+.place-pick:nth-child(1) .line-place-thumb {
   background:
     linear-gradient(0deg, transparent 56%, var(--ink) 57% 59%, transparent 60%),
     repeating-linear-gradient(90deg, transparent 0 12px, rgba(23, 19, 16, 0.45) 13px 14px),
@@ -109,8 +108,7 @@
 }
 
 .mini-card:nth-child(2) .line-place-thumb,
-.place-pick:nth-child(2) .line-place-thumb,
-.saved-card:nth-child(2) .line-place-thumb {
+.place-pick:nth-child(2) .line-place-thumb {
   background:
     repeating-linear-gradient(90deg, transparent 0 16px, rgba(23, 19, 16, 0.48) 17px 18px),
     repeating-linear-gradient(0deg, transparent 0 13px, rgba(23, 19, 16, 0.28) 14px 15px),
@@ -119,8 +117,7 @@
 }
 
 .mini-card:nth-child(3) .line-place-thumb,
-.place-pick:nth-child(3) .line-place-thumb,
-.saved-card:nth-child(3) .line-place-thumb {
+.place-pick:nth-child(3) .line-place-thumb {
   background:
     radial-gradient(circle at 42% 32%, transparent 0 8px, var(--ink) 9px 10px, transparent 11px),
     radial-gradient(circle at 58% 44%, transparent 0 7px, var(--ink) 8px 9px, transparent 10px),

@@ -131,6 +131,7 @@
   .compact-safe-grid,
   .her-day-suggestion-grid,
   .living-guide-grid,
+  .favorites-grid,
   .mini-grid,
   .notes-grid,
   .note-form {
@@ -418,8 +419,21 @@
   .places-map-layout,
   .product-map,
   .filter-list.horizontal,
+  .favorites-grid,
   .mini-grid {
     max-width: 100%;
+  }
+
+  .favorites-grid {
+    justify-content: stretch;
+  }
+
+  .favorite-card {
+    width: 100%;
+  }
+
+  .favorite-card-actions {
+    gap: 8px;
   }
 
   .section-title {

@@ -5,7 +5,7 @@ import {
   safetyGuides,
   savedDayPlans,
 } from './data.js';
-import { loadCurrentDayDraft, loadLivingStepProgress, loadNotes, loadSavedDays, loadSavedGuides, loadSavedPlaces, mergeDayPlans } from './storage.js';
+import { loadCurrentDayDraft, loadLivingStepProgress, loadLocationEnabled, loadNotes, loadSavedDays, loadSavedGuides, loadSavedPlaces, mergeDayPlans } from './storage.js';
 
 const initialSavedPlaceIds = loadSavedPlaces() || favoritePlaceIds;
 const currentDayDraft = loadCurrentDayDraft();
@@ -21,7 +21,7 @@ export const state = {
     language: "English / Japanese",
     budget: "3000 yen",
     preferences: ["Quiet", "Women friendly", "Solo friendly"],
-    locationEnabled: true,
+    locationEnabled: loadLocationEnabled(),
   },
   authMode: "register",
   selectedSafe: "",
