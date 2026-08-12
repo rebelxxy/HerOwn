@@ -8,17 +8,18 @@
       content="HER OWN is a digital companion for women living independently, safely, and freely."
     />
     <title>HER OWN</title>
+    <link rel="icon" href="data:," />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="css/base.css?v=20260806-day-layout-final7" />
-    <link rel="stylesheet" href="css/layout.css?v=20260806-day-layout-final7" />
-    <link rel="stylesheet" href="css/components.css?v=20260806-day-layout-final7" />
-    <link rel="stylesheet" href="css/pages.css?v=20260806-day-layout-final7" />
-    <link rel="stylesheet" href="css/responsive.css?v=20260806-day-layout-final7" />
+    <link rel="stylesheet" href="css/base.css?v=20260811-safe-freeze" />
+    <link rel="stylesheet" href="css/layout.css?v=20260811-safe-freeze" />
+    <link rel="stylesheet" href="css/components.css?v=20260811-safe-freeze" />
+    <link rel="stylesheet" href="css/pages.css?v=20260811-safe-freeze" />
+    <link rel="stylesheet" href="css/responsive.css?v=20260811-safe-freeze" />
   </head>
   <body>
     <div class="app-frame">
@@ -46,6 +47,7 @@
             <option value="zh">中文</option>
           </select>
           <button class="mobile-menu" type="button" aria-label="Toggle menu">
+            <span></span>
             <span></span>
             <span></span>
           </button>
@@ -78,20 +80,8 @@
         </form>
       </aside>
 
-      <div class="phone-overlay" id="phoneOverlay" aria-hidden="true">
-        <div class="phone-screen" role="dialog" aria-modal="true" aria-label="Fake call">
-          <div class="caller-avatar" id="callerAvatar">M</div>
-          <p class="incoming-label" id="incomingLabel">Incoming call</p>
-          <h2 id="callerName">Mom</h2>
-          <p id="callerLine">Are you there?</p>
-          <div class="call-actions">
-            <button class="call-end" type="button" id="declineCall" aria-label="Decline call">×</button>
-            <button class="call-answer" type="button" id="answerCall" aria-label="Answer call">✓</button>
-          </div>
-        </div>
-      </div>
     </div>
 
-    <script type="module" src="js/main.js?v=20260806-day-layout-final7"></script>
+    <script type="module" src="js/main.js?v=20260811-safe-freeze"></script>
   </body>
 </html>

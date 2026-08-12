@@ -5,7 +5,7 @@ import {
   safetyGuides,
   savedDayPlans,
 } from './data.js';
-import { loadCurrentDayDraft, loadNotes, loadSavedDays, loadSavedGuides, loadSavedPlaces, mergeDayPlans } from './storage.js';
+import { loadCurrentDayDraft, loadLivingStepProgress, loadNotes, loadSavedDays, loadSavedGuides, loadSavedPlaces, mergeDayPlans } from './storage.js';
 
 const initialSavedPlaceIds = loadSavedPlaces() || favoritePlaceIds;
 const currentDayDraft = loadCurrentDayDraft();
@@ -25,12 +25,11 @@ export const state = {
   },
   authMode: "register",
   selectedSafe: "",
-  selectedCaller: "mom",
-  selectedTimer: "now",
   safetyCallStep: "intro",
   safetyCallCaller: "anna",
   safetyCallDelay: "10",
   safetyCallRemaining: 10,
+  safetyCallDuration: 0,
   safetyCallSoundOn: true,
   safetyCallVisibleMessages: 0,
   safeRouteFrom: "",
@@ -50,7 +49,7 @@ export const state = {
   selectedLivingCategory: "",
   selectedGuide: "",
   livingSearch: "",
-  livingStepProgress: {},
+  livingStepProgress: loadLivingStepProgress(),
   savedGuideIds: loadSavedGuides(),
   selectedPlaceCategory: "All",
   selectedPlaceExperiences: [],

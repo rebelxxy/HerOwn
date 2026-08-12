@@ -153,6 +153,38 @@ function tagMarkup(tags) {
     : "";
 }
 
+function experienceFilterMarkup(activeExperiences) {
+  const defaultCount = 5;
+  const primaryFilters = placeExperienceFilters.slice(0, defaultCount);
+  const overflowFilters = placeExperienceFilters.slice(defaultCount);
+  const overflowHasSelection = overflowFilters.some((filter) => activeExperiences.includes(filter));
+
+  return `
+    <div class="filter-list horizontal places-experience-list">
+      ${primaryFilters
+        .map((filter) => filterChip(filter, activeExperiences.includes(filter), `data-place-experience="${escapeHtml(filter)}"`))
+        .join("")}
+      ${
+        overflowFilters.length
+          ? `
+            <details class="places-more-filters"${overflowHasSelection ? " open" : ""}>
+              <summary>
+                <span>${t("placesMoreFilters")}</span>
+                <span>${overflowFilters.length}</span>
+              </summary>
+              <div class="places-more-filter-list">
+                ${overflowFilters
+                  .map((filter) => filterChip(filter, activeExperiences.includes(filter), `data-place-experience="${escapeHtml(filter)}"`))
+                  .join("")}
+              </div>
+            </details>
+          `
+          : ""
+      }
+    </div>
+  `;
+}
+
 function reasonMarkup(place) {
   const reasons = asArray(place.whyRecommended || place.reason);
   return reasons.length
@@ -332,11 +364,11 @@ function detailPanel(selected) {
           <span>${escapeHtml(selected.priceRange || selected.budget || "Prototype price")}</span>
         </div>
       </div>
-      <div class="places-detail-block">
+      <div class="places-detail-block places-experience-tags">
         <strong>Experience tags</strong>
         ${tagMarkup(experienceTags)}
       </div>
-      <div class="places-detail-block">
+      <div class="places-detail-block places-practical-tags">
         <strong>Practical tags</strong>
         ${tagMarkup(practicalTags)}
       </div>
@@ -357,7 +389,7 @@ function detailPanel(selected) {
         }
         ${
           saved
-            ? `<button class="soft-button is-saved" type="button" disabled>Saved</button>`
+            ? `<button class="soft-button is-saved" type="button" disabled>${t("placesSaved")}</button>`
             : `<button class="soft-button" type="button" data-save-place="${escapeHtml(selected.id)}">Save Place</button>`
         }
         <button class="soft-button" type="button" data-open-safe-route-place="${escapeHtml(selected.id)}">${t("safetyCallOpenSafeRoute")}</button>
@@ -366,7 +398,7 @@ function detailPanel(selected) {
             ? `<button class="button is-saved" type="button" disabled>Added to HER Day</button>`
             : `<button class="button" type="button" data-add-place-day="${escapeHtml(selected.id)}">Add to HER Day</button>`
         }
-        <button class="text-button" type="button" data-place-back>Back</button>
+        <button class="text-button places-back-action" type="button" data-place-back>${t("placesBackToResults")}</button>
       </div>
     </article>
   `;
@@ -431,11 +463,7 @@ export function renderPlaces() {
               : ""
           }
         </div>
-        <div class="filter-list horizontal places-experience-list">
-          ${placeExperienceFilters
-            .map((filter) => filterChip(filter, activeExperiences.includes(filter), `data-place-experience="${escapeHtml(filter)}"`))
-            .join("")}
-        </div>
+        ${experienceFilterMarkup(activeExperiences)}
         <div class="places-filter-group">
           <p class="eyebrow">Category filters</p>
           <div class="filter-list horizontal">

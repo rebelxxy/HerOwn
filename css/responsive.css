@@ -217,7 +217,7 @@
   }
 
   .mobile-menu {
-    display: grid;
+    display: flex;
     flex: 0 0 auto;
   }
 
@@ -345,6 +345,15 @@
   }
 }
 
+@media (max-width: 1020px) {
+  .living-category-panel .category-button {
+    flex: 0 0 auto;
+    width: max-content;
+    min-width: max-content;
+    padding: 10px 14px;
+  }
+}
+
 @media (max-width: 760px) {
   h1,
   .display {
@@ -437,6 +446,27 @@
     flex-wrap: nowrap;
     overflow-x: auto;
     padding-bottom: 4px;
+  }
+
+  .places-mvp .filter-list.horizontal.places-experience-list {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .places-mvp .places-more-filters {
+    position: static;
+    width: 100%;
+  }
+
+  .places-mvp .places-more-filters summary {
+    max-width: 100%;
+  }
+
+  .places-mvp .places-more-filter-list {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+    box-shadow: none;
   }
 
   .places-experience-list .filter-chip,
@@ -855,6 +885,17 @@
 
   .safety-message {
     max-width: 100%;
+  }
+
+  .safety-connected-head,
+  .safety-connected-person {
+    width: 100%;
+  }
+
+  .safety-connected-person {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
   }
 
   .safe-route-head,

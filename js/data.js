@@ -33,7 +33,7 @@ export const safetyGuides = [
     phrase: "近くまで一緒にいてもらえますか？",
     steps: [
       ["First Step", "Choose lit streets, stations, convenience stores, and roads with people nearby."],
-      ["Stay connected", "Start a fake call or real call before leaving the station or building."],
+      ["Stay connected", "Start Safety Call or a real call before leaving the station or building."],
       ["Avoid shortcuts", "Skip quiet parks, underpasses, empty alleys, and stairways even if they are faster."],
       ["Prepare arrival", "Have keys ready before the door and look around before entering your building."],
     ],
@@ -76,37 +76,6 @@ export const safetyGuides = [
       ["Use short words", "Say where you are, what is happening, and what you need right now."],
       ["Do not delay", "If you feel in immediate danger, use emergency services before app features."],
     ],
-  },
-];
-
-export const callers = [
-  {
-    id: "mom",
-    name: "Mom",
-    avatar: "M",
-    role: "Warm and direct",
-    lines: ["Are you there?", "I am nearby now.", "Can you come outside?", "Stay on the phone with me."],
-  },
-  {
-    id: "friend",
-    name: "Mina",
-    avatar: "M",
-    role: "Close friend",
-    lines: ["Hey, I can see your location.", "I am walking toward you.", "Keep talking to me.", "Let's meet at the entrance."],
-  },
-  {
-    id: "roommate",
-    name: "Roommate",
-    avatar: "R",
-    role: "At home",
-    lines: ["I am waiting downstairs.", "Do you want me to call you?", "Don't come up alone.", "Send me the building entrance."],
-  },
-  {
-    id: "boss",
-    name: "Boss",
-    avatar: "B",
-    role: "Formal excuse",
-    lines: ["Can you join the call now?", "We need you back online.", "Please step out and call me.", "I will stay connected."],
   },
 ];
 

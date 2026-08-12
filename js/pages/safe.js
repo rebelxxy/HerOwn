@@ -6,6 +6,7 @@ import { buildGoogleMapsDirectionsUrl, buildGoogleMapsSearchUrl } from '../utils
 let safetyCallRender = () => {};
 let countdownTimer = null;
 let conversationTimer = null;
+let callDurationTimer = null;
 let ringtoneTimer = null;
 let audioContext = null;
 
@@ -27,7 +28,11 @@ const safetyCallCallers = [
   {
     id: "anna",
     avatar: "A",
-    name: "Anna",
+    name: {
+      en: "Anna",
+      ja: "Anna",
+      zh: "Anna",
+    },
     preview: {
       en: "I'm waiting outside.",
       ja: "外で待っているね。",
@@ -42,7 +47,11 @@ const safetyCallCallers = [
   {
     id: "mia",
     avatar: "M",
-    name: "Mia",
+    name: {
+      en: "Mia",
+      ja: "Mia",
+      zh: "Mia",
+    },
     preview: {
       en: "Did you get here?",
       ja: "もう着いた？",
@@ -57,7 +66,11 @@ const safetyCallCallers = [
   {
     id: "dad",
     avatar: "D",
-    name: "Dad",
+    name: {
+      en: "Dad",
+      ja: "父",
+      zh: "爸爸",
+    },
     preview: {
       en: "Are you home yet?",
       ja: "もう家に着いた？",
@@ -72,7 +85,11 @@ const safetyCallCallers = [
   {
     id: "cafe",
     avatar: "C",
-    name: "Cafe",
+    name: {
+      en: "Cafe",
+      ja: "カフェ",
+      zh: "咖啡店",
+    },
     preview: {
       en: "Your table is ready.",
       ja: "お席の準備ができました。",
@@ -153,6 +170,11 @@ function clearConversationTimer() {
   conversationTimer = null;
 }
 
+function clearCallDurationTimer() {
+  if (callDurationTimer) window.clearInterval(callDurationTimer);
+  callDurationTimer = null;
+}
+
 function stopRingtone() {
   if (ringtoneTimer) window.clearInterval(ringtoneTimer);
   ringtoneTimer = null;
@@ -161,6 +183,7 @@ function stopRingtone() {
 function clearSafetyCallTimers() {
   clearCountdownTimer();
   clearConversationTimer();
+  clearCallDurationTimer();
   stopRingtone();
 }
 
@@ -213,8 +236,17 @@ export function openSafetyCall() {
   state.safetyCallCaller = state.safetyCallCaller || "anna";
   state.safetyCallDelay = state.safetyCallDelay || "10";
   state.safetyCallRemaining = safetyDelay().seconds;
+  state.safetyCallDuration = 0;
   state.safetyCallVisibleMessages = 0;
   requestSafetyCallRender();
+}
+
+export function resetSafetyCallState() {
+  clearSafetyCallTimers();
+  state.safetyCallStep = "intro";
+  state.safetyCallRemaining = safetyDelay().seconds;
+  state.safetyCallDuration = 0;
+  state.safetyCallVisibleMessages = 0;
 }
 
 export function setSafetyCallCaller(callerId) {
@@ -232,6 +264,7 @@ export function goToSafetyCallStep(step) {
   if (!["intro", "caller", "delay"].includes(step)) return;
   clearSafetyCallTimers();
   state.safetyCallStep = step;
+  state.safetyCallDuration = 0;
   state.safetyCallVisibleMessages = 0;
   requestSafetyCallRender();
 }
@@ -261,6 +294,7 @@ export function startSafetyCallCountdown() {
   }
 
   state.safetyCallStep = "countdown";
+  state.safetyCallDuration = 0;
   requestSafetyCallRender();
   countdownTimer = window.setInterval(() => {
     state.safetyCallRemaining = Math.max(0, Number(state.safetyCallRemaining) - 1);
@@ -276,6 +310,7 @@ export function cancelSafetyCall() {
   clearSafetyCallTimers();
   state.safetyCallStep = "intro";
   state.safetyCallRemaining = safetyDelay().seconds;
+  state.safetyCallDuration = 0;
   state.safetyCallVisibleMessages = 0;
   requestSafetyCallRender();
 }
@@ -289,9 +324,15 @@ export function cancelSafetyCallCountdown() {
 export function acceptSafetyCall() {
   stopRingtone();
   clearConversationTimer();
+  clearCallDurationTimer();
   state.safetyCallStep = "conversation";
+  state.safetyCallDuration = 0;
   state.safetyCallVisibleMessages = 1;
   requestSafetyCallRender();
+  callDurationTimer = window.setInterval(() => {
+    state.safetyCallDuration = Math.max(0, Number(state.safetyCallDuration) || 0) + 1;
+    requestSafetyCallRender();
+  }, 1000);
   conversationTimer = window.setInterval(() => {
     const messages = localize(safetyCaller().messages);
     state.safetyCallVisibleMessages = Math.min(messages.length, state.safetyCallVisibleMessages + 1);
@@ -317,6 +358,7 @@ export function finishSafetyCall() {
   clearSafetyCallTimers();
   state.safetyCallStep = "intro";
   state.selectedSafe = "";
+  state.safetyCallDuration = 0;
   state.safetyCallVisibleMessages = 0;
   requestSafetyCallRender();
 }
@@ -512,6 +554,8 @@ const safeScenarios = [
   },
 ];
 
+const SCENARIO_GUIDE_VIEW = "guide";
+
 function scenarioById(id = state.selectedSafe) {
   return safeScenarios.find((scenario) => scenario.id === id) || null;
 }
@@ -655,11 +699,11 @@ function listItems(items) {
 function renderWhy(scenario) {
   return `
     <section class="surface safe-why-section">
-      <button class="safe-why-toggle" type="button" aria-expanded="false" aria-controls="safeWhyPanel" data-safe-why-toggle>
+      <button class="safe-why-toggle" type="button" aria-expanded="true" aria-controls="safeWhyPanel" data-safe-why-toggle>
         <span>${t("safeWhyHelps")}</span>
-        <span aria-hidden="true">+</span>
+        <span aria-hidden="true">−</span>
       </button>
-      <div id="safeWhyPanel" class="safe-why-panel" hidden>
+      <div id="safeWhyPanel" class="safe-why-panel">
         <div>
           <strong>${t("safeAvoid")}</strong>
           ${listItems(localize(scenario.why.avoid))}
@@ -672,8 +716,8 @@ function renderWhy(scenario) {
           <div>
             <strong>${t("safeEmergencyInfo")}</strong>
             <ul>
-              <li>Police: 110</li>
-              <li>Ambulance / Fire: 119</li>
+              <li>${t("safePoliceEmergency")}: 110</li>
+              <li>${t("safeAmbulanceFireEmergency")}: 119</li>
             </ul>
           </div>
         ` : ""}
@@ -882,7 +926,15 @@ function renderSafeRoute() {
 }
 
 function countdownLabel() {
-  const seconds = Math.max(0, Number(state.safetyCallRemaining) || 0);
+  return timeLabel(state.safetyCallRemaining);
+}
+
+function callDurationLabel() {
+  return timeLabel(state.safetyCallDuration);
+}
+
+function timeLabel(value) {
+  const seconds = Math.max(0, Number(value) || 0);
   const minutes = String(Math.floor(seconds / 60)).padStart(2, "0");
   const remainingSeconds = String(seconds % 60).padStart(2, "0");
   return `${minutes}:${remainingSeconds}`;
@@ -923,7 +975,7 @@ function renderSafetyCallCallerChoice() {
           <button class="safety-caller-card ${item.id === caller.id ? "is-selected" : ""}" type="button" data-safety-call-caller="${escapeHtml(item.id)}" aria-pressed="${item.id === caller.id}">
             <span class="safety-caller-avatar" aria-hidden="true">${escapeHtml(item.avatar)}</span>
             <span>
-              <strong>${escapeHtml(item.name)}</strong>
+              <strong>${escapeHtml(localize(item.name))}</strong>
               <small>${escapeHtml(localize(item.preview))}</small>
             </span>
           </button>
@@ -982,7 +1034,7 @@ function renderSafetyCallIncoming() {
     <div class="safety-call-stage safety-call-centered">
       <p class="eyebrow">${t("safetyCallIncoming")}</p>
       <div class="safety-incoming-orb" aria-hidden="true">${escapeHtml(caller.avatar)}</div>
-      <h2>${escapeHtml(caller.name)}</h2>
+      <h2>${escapeHtml(localize(caller.name))}</h2>
       <p>${t("safetyCallRingingCopy")}</p>
       <div class="safety-call-footer is-centered">
         <button class="soft-button" type="button" data-safety-call-decline>${t("safetyCallDecline")}</button>
@@ -1000,15 +1052,26 @@ function renderSafetyCallConversation() {
   const messages = localize(caller.messages);
   const visibleMessages = messages.slice(0, Math.max(1, state.safetyCallVisibleMessages));
   return `
-    <div class="safety-call-stage">
-      <div>
-        <p class="eyebrow">${t("safetyCallConversation")}</p>
-        <h2>${escapeHtml(caller.name)}</h2>
+    <div class="safety-call-stage safety-call-connected">
+      <div class="safety-connected-head">
+        <div class="safety-connected-status">
+          <span class="safety-live-dot" aria-hidden="true"></span>
+          <span>${t("safetyCallConnected")}</span>
+        </div>
+        <strong>${callDurationLabel()}</strong>
+      </div>
+      <div class="safety-connected-person">
+        <span class="safety-caller-avatar" aria-hidden="true">${escapeHtml(caller.avatar)}</span>
+        <div>
+          <p class="eyebrow">${t("safetyCallConversation")}</p>
+          <h2>${escapeHtml(localize(caller.name))}</h2>
+          <p>${t("safetyCallDuration")}: ${callDurationLabel()}</p>
+        </div>
       </div>
       <div class="safety-message-list" aria-live="polite">
         ${visibleMessages.map((message) => `
           <div class="safety-message">
-            <strong>${escapeHtml(caller.name)}</strong>
+            <strong>${escapeHtml(localize(caller.name))}</strong>
             <span>${escapeHtml(message)}</span>
           </div>
         `).join("")}
@@ -1067,6 +1130,12 @@ function renderScenarioHome() {
       </div>
     </section>
     ${renderSafetyCall()}
+    ${renderScenarioCards()}
+  `;
+}
+
+function renderScenarioCards() {
+  return `
     <div id="safeScenarioGuide" class="safe-scenario-grid">
       ${safeScenarios.map((scenario) => `
         <button class="surface safe-scenario-card ${scenario.emergency ? "is-emergency" : ""}" type="button" data-safe="${scenario.id}">
@@ -1078,6 +1147,21 @@ function renderScenarioHome() {
           <span class="safe-scenario-arrow" aria-hidden="true">›</span>
         </button>
       `).join("")}
+    </div>
+  `;
+}
+
+function renderScenarioGuideSelection() {
+  return `
+    <div class="safe-detail-v1">
+      <section class="surface safe-scenario-detail-head">
+        <div>
+          <p class="eyebrow">${t("safeHeroTitle")}</p>
+          <h1 class="section-title">${t("safetyCallScenarioGuide")}</h1>
+          <p class="section-copy">${t("safeWhatHappened")}</p>
+        </div>
+      </section>
+      ${renderScenarioCards()}
     </div>
   `;
 }
@@ -1118,6 +1202,9 @@ function renderScenarioDetail(scenario) {
 export function renderSafe() {
   if (state.selectedSafe === "route") {
     return pageShell(renderSafeRoute(), "safe-v1-page");
+  }
+  if (state.selectedSafe === SCENARIO_GUIDE_VIEW) {
+    return pageShell(renderScenarioGuideSelection(), "safe-v1-page");
   }
   const selected = scenarioById();
   return pageShell(selected ? renderScenarioDetail(selected) : renderScenarioHome(), "safe-v1-page");

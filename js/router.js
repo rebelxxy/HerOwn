@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import { renderStaticText, t } from './i18n.js';
 import { saveDayPlan, saveFavoritePlace } from './api.js';
-import { clearCurrentDayDraft, hasSavedDayPlan, mergeDayPlans, persistCurrentDayDraft, persistNotes, persistSavedDays, persistSavedGuides, persistSavedPlaces } from './storage.js';
+import { clearCurrentDayDraft, hasSavedDayPlan, mergeDayPlans, persistCurrentDayDraft, persistLivingStepProgress, persistNotes, persistSavedDays, persistSavedGuides, persistSavedPlaces } from './storage.js';
 import { renderAssistant } from './components/assistant.js';
 import { renderHome } from './pages/home.js';
 import {
@@ -13,6 +13,7 @@ import {
   finishSafetyCall,
   goToSafetyCallStep,
   openSafetyCall,
+  resetSafetyCallState,
   renderSafe,
   setSafetyCallCaller,
   setSafetyCallDelay,
@@ -20,9 +21,8 @@ import {
   startSafetyCallCountdown,
   toggleSafetyCallSound,
 } from './pages/safe.js';
-import { renderFakeCall, startFakeCall, answerFakeCall, closeCallOverlay } from './pages/fakeCall.js';
 import { renderSOS } from './pages/sos.js';
-import { renderLiving } from './pages/living.js';
+import { getLivingGuide, renderLiving } from './pages/living.js';
 import { renderPlaces } from './pages/places.js';
 import { createAdditionalDayStop, createCurrentDayPlan, createDayPlanApiPayload, createDraftDayPlan, generateAdjustedDayPlan, getDayPlan, getDaySuggestion, normalizeSuggestionPlan, reflowDayPlan, renderDay } from './pages/day.js';
 import { renderMy } from './pages/my.js';
@@ -33,20 +33,127 @@ const app = document.querySelector('#app');
 const navLinks = [...document.querySelectorAll('.nav-link[data-page], .icon-button[data-page]')];
 const mainNav = document.querySelector('.main-nav');
 const menuButton = document.querySelector('.mobile-menu');
-const phoneOverlay = document.querySelector('#phoneOverlay');
-const answerCall = document.querySelector('#answerCall');
-const declineCall = document.querySelector('#declineCall');
+const validPages = ['home', 'auth', 'dashboard', 'safe', 'sos', 'living', 'places', 'day', 'my'];
+const safeGuideHash = "safe-guide";
+const safeCallHash = "safe-call";
+const safeRouteHash = "safe-route";
+const safeScenarioHashPrefix = "safe-scenario-";
+const safeGuideView = "guide";
 let renderedPage = "";
 
 function navigate(page) {
   state.page = page;
+  if (page === "safe") {
+    state.selectedSafe = "";
+    state.safeRouteSavedPickerOpen = false;
+    resetSafetyCallState();
+  }
   if (location.hash !== `#${page}`) {
     history.replaceState(null, "", `#${page}`);
   }
   mainNav.classList.remove("is-open");
+  menuButton.setAttribute("aria-expanded", "false");
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
   app.focus({ preventScroll: true });
+}
+
+function pageFromHash(hash) {
+  if (
+    hash === safeGuideHash ||
+    hash === safeCallHash ||
+    hash === safeRouteHash ||
+    hash === "fakeCall" ||
+    hash.startsWith(safeScenarioHashPrefix)
+  ) return "safe";
+  return validPages.includes(hash) ? hash : "";
+}
+
+function applySafeHashState(hash) {
+  if (hash === "safe" || hash === "") {
+    state.selectedSafe = "";
+    resetSafetyCallState();
+    return;
+  }
+  if (hash === safeGuideHash) {
+    state.selectedSafe = safeGuideView;
+    resetSafetyCallState();
+    return;
+  }
+  if (hash === safeRouteHash) {
+    state.selectedSafe = "route";
+    resetSafetyCallState();
+    return;
+  }
+  if (hash === safeCallHash || hash === "fakeCall") {
+    state.selectedSafe = "";
+    resetSafetyCallState();
+    state.safetyCallStep = "caller";
+    state.safetyCallRemaining = 10;
+    state.safetyCallDuration = 0;
+    state.safetyCallVisibleMessages = 0;
+    return;
+  }
+  if (hash.startsWith(safeScenarioHashPrefix)) {
+    state.selectedSafe = hash.slice(safeScenarioHashPrefix.length);
+    resetSafetyCallState();
+  }
+}
+
+function scrollToSafeScenarioGuide() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      app.querySelector("#safeScenarioGuide")?.scrollIntoView({ behavior: "auto", block: "start" });
+    });
+  });
+}
+
+function openSafeScenarioGuide() {
+  state.page = "safe";
+  state.selectedSafe = safeGuideView;
+  resetSafetyCallState();
+  mainNav.classList.remove("is-open");
+  menuButton.setAttribute("aria-expanded", "false");
+  if (location.hash !== `#${safeGuideHash}`) {
+    history.pushState(null, "", `#${safeGuideHash}`);
+  }
+  render();
+  scrollToSafeScenarioGuide();
+}
+
+function openSafetyCallPage() {
+  state.page = "safe";
+  mainNav.classList.remove("is-open");
+  menuButton.setAttribute("aria-expanded", "false");
+  if (location.hash !== `#${safeCallHash}`) {
+    history.pushState(null, "", `#${safeCallHash}`);
+  }
+  openSafetyCall();
+}
+
+function openSafeRoutePage() {
+  state.page = "safe";
+  state.selectedSafe = "route";
+  resetSafetyCallState();
+  state.safeRouteFromError = "";
+  state.safeRouteToError = "";
+  if (location.hash !== `#${safeRouteHash}`) {
+    history.pushState(null, "", `#${safeRouteHash}`);
+  }
+  renderPreservingScroll();
+}
+
+function openSafeScenario(id) {
+  state.page = "safe";
+  state.selectedSafe = id;
+  if (location.hash !== `#${safeScenarioHashPrefix}${id}`) {
+    history.pushState(null, "", `#${safeScenarioHashPrefix}${id}`);
+  }
+  renderPreservingScroll({
+    selector: "[data-safe]",
+    datasetKey: "safe",
+    value: id,
+  });
 }
 
 function setActiveNav() {
@@ -163,7 +270,6 @@ function render() {
     auth: renderAuth,
     dashboard: renderDashboard,
     safe: renderSafe,
-    fakeCall: renderFakeCall,
     sos: renderSOS,
     living: renderLiving,
     places: renderPlaces,
@@ -298,14 +404,14 @@ function renderDashboard() {
         <div class="quick-grid">
           ${[
             ["safe", "Safe Mode", "◇"],
-            ["fakeCall", "Fake Call", "☎"],
+            ["safetyCall", "Safety Call", "☎"],
             ["places", "HER Places", "⌖"],
             ["day", "HER Day", "✦"],
             ["living", "Living Guide", "⌂"],
           ]
             .map(
               ([page, label, icon]) => `
-                <button class="quick-action" type="button" data-page="${page}">
+                <button class="quick-action" type="button" ${page === "safetyCall" ? "data-open-safety-call-page" : `data-page="${page}"`}>
                   <span>${icon}</span>
                   ${label}
                 </button>
@@ -760,7 +866,7 @@ function bindPageEvents() {
       const guideId = button.dataset.confirmRemoveGuide;
       state.savedGuideIds = persistSavedGuides(state.savedGuideIds.filter((id) => id !== guideId));
       state.pendingRemoveGuideId = "";
-      showToast("Removed");
+      showToast(t("livingGuideRemovedToast"));
       render();
     });
   });
@@ -901,29 +1007,22 @@ function bindPageEvents() {
 
   app.querySelectorAll("[data-safe]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.selectedSafe = button.dataset.safe;
-      renderPreservingScroll({
-        selector: "[data-safe]",
-        datasetKey: "safe",
-        value: button.dataset.safe,
-      });
+      openSafeScenario(button.dataset.safe);
     });
   });
 
   app.querySelectorAll("[data-safe-home]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedSafe = "";
+      if (state.page === "safe" && location.hash !== "#safe") {
+        history.pushState(null, "", "#safe");
+      }
       renderPreservingScroll();
     });
   });
 
   app.querySelectorAll("[data-safe-route-open]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.selectedSafe = "route";
-      state.safeRouteFromError = "";
-      state.safeRouteToError = "";
-      renderPreservingScroll();
-    });
+    button.addEventListener("click", openSafeRoutePage);
   });
 
   app.querySelectorAll("[data-safe-route-form]").forEach((form) => {
@@ -1094,12 +1193,23 @@ function bindPageEvents() {
       const panel = app.querySelector(`#${button.getAttribute("aria-controls")}`);
       const expanded = button.getAttribute("aria-expanded") === "true";
       button.setAttribute("aria-expanded", String(!expanded));
+      const icon = button.querySelector("[aria-hidden='true']");
+      if (icon) icon.textContent = expanded ? "+" : "−";
       if (panel) panel.hidden = expanded;
     });
   });
 
   app.querySelectorAll("[data-safety-call-open]").forEach((button) => {
-    button.addEventListener("click", openSafetyCall);
+    button.addEventListener("click", () => {
+      if (state.page === "safe" && location.hash !== `#${safeCallHash}`) {
+        history.pushState(null, "", `#${safeCallHash}`);
+      }
+      openSafetyCall();
+    });
+  });
+
+  app.querySelectorAll("[data-open-safety-call-page]").forEach((button) => {
+    button.addEventListener("click", openSafetyCallPage);
   });
 
   app.querySelectorAll("[data-safety-call-caller]").forEach((button) => {
@@ -1149,33 +1259,13 @@ function bindPageEvents() {
   });
 
   app.querySelectorAll("[data-safe-scenario-guide]").forEach((button) => {
-    button.addEventListener("click", () => {
-      app.querySelector("#safeScenarioGuide")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    button.addEventListener("click", openSafeScenarioGuide);
   });
 
   app.querySelectorAll("[data-safety-call-emergency-phrases]").forEach((button) => {
     button.addEventListener("click", () => {
       openSafeModal(button.dataset.safetyCallEmergencyPhrases, t("safetyCallEmergencyPhrases"));
     });
-  });
-
-  app.querySelectorAll("[data-caller]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.selectedCaller = button.dataset.caller;
-      render();
-    });
-  });
-
-  app.querySelectorAll("[data-timer]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.selectedTimer = button.dataset.timer;
-      render();
-    });
-  });
-
-  app.querySelectorAll("[data-start-call]").forEach((button) => {
-    button.addEventListener("click", startFakeCall);
   });
 
   app.querySelectorAll("[data-sos]").forEach((button) => {
@@ -1202,7 +1292,11 @@ function bindPageEvents() {
       state.selectedLivingCategory = state.selectedLivingCategory === button.dataset.livingCategory ? "" : button.dataset.livingCategory;
       state.livingSearch = "";
       state.selectedGuide = "";
-      render();
+      renderPreservingScroll({
+        selector: "[data-living-category]",
+        datasetKey: "livingCategory",
+        value: button.dataset.livingCategory,
+      });
     });
   });
 
@@ -1220,7 +1314,15 @@ function bindPageEvents() {
       state.livingSearch = String(formData.get("livingSearch") || "").trim();
       state.selectedLivingCategory = "";
       state.selectedGuide = "";
-      render();
+      renderPreservingScroll();
+    });
+  });
+
+  app.querySelectorAll("#livingSearch").forEach((input) => {
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      input.form?.requestSubmit();
     });
   });
 
@@ -1229,7 +1331,7 @@ function bindPageEvents() {
       state.livingSearch = "";
       state.selectedLivingCategory = "";
       state.selectedGuide = "";
-      render();
+      renderPreservingScroll();
     });
   });
 
@@ -1245,9 +1347,19 @@ function bindPageEvents() {
       const guideId = button.dataset.saveGuide;
       if (!state.savedGuideIds.includes(guideId)) {
         state.savedGuideIds = persistSavedGuides([...state.savedGuideIds, guideId]);
+        showToast(t("livingGuideSavedToast"));
       }
-      showToast("Guide saved");
-      render();
+      renderPreservingScroll();
+    });
+  });
+
+  app.querySelectorAll("[data-living-play-phrase]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const guide = getLivingGuide();
+      const phrases = guide?.japanesePhrases || guide?.phrases || [];
+      const phrase = phrases[Number(button.dataset.livingPlayPhrase)];
+      if (!phrase) return;
+      playSafePhrase(phrase, button);
     });
   });
 
@@ -1262,11 +1374,20 @@ function bindPageEvents() {
       } else {
         current.delete(stepIndex);
       }
-      state.livingStepProgress = {
+      state.livingStepProgress = persistLivingStepProgress({
         ...state.livingStepProgress,
         [guideId]: [...current].sort((a, b) => a - b),
-      };
-      render();
+      });
+
+      const guide = state.catalogs.livingGuides.find((item) => item.id === guideId);
+      const totalSteps = Array.isArray(guide?.steps) ? guide.steps.length : 0;
+      const completedSteps = state.livingStepProgress[guideId]?.length || 0;
+      showToast(totalSteps && completedSteps === totalSteps ? t("livingChecklistCompletedToast") : t("livingProgressUpdatedToast"));
+      renderPreservingScroll({
+        selector: "[data-living-step]",
+        datasetKey: "livingStep",
+        value: checkbox.dataset.livingStep,
+      });
     });
   });
 
@@ -1633,7 +1754,10 @@ export function initRouter() {
     }
   });
 
-  menuButton.addEventListener('click', () => mainNav.classList.toggle('is-open'));
+  menuButton.addEventListener('click', () => {
+    const isOpen = mainNav.classList.toggle('is-open');
+    menuButton.setAttribute("aria-expanded", String(isOpen));
+  });
 
   document.querySelector('#languageSelect').addEventListener('change', (event) => {
     state.lang = event.target.value;
@@ -1641,23 +1765,24 @@ export function initRouter() {
     render();
   });
 
-  answerCall.addEventListener('click', answerFakeCall);
-  declineCall.addEventListener('click', closeCallOverlay);
-  phoneOverlay.addEventListener('click', (event) => { if (event.target === phoneOverlay) closeCallOverlay(); });
-
-  const validPages = ['home', 'auth', 'dashboard', 'safe', 'fakeCall', 'sos', 'living', 'places', 'day', 'my'];
-  const initialPage = location.hash.replace('#', '');
-  if (validPages.includes(initialPage)) state.page = initialPage;
+  const initialHash = location.hash.replace('#', '');
+  const initialPage = pageFromHash(initialHash);
+  if (initialPage) state.page = initialPage;
+  if (initialPage === "safe") applySafeHashState(initialHash);
 
   window.addEventListener('hashchange', () => {
-    const nextPage = location.hash.replace('#', '');
-    if (validPages.includes(nextPage)) {
+    const nextHash = location.hash.replace('#', '');
+    const nextPage = pageFromHash(nextHash);
+    if (nextPage) {
       state.page = nextPage;
+      if (nextPage === "safe") applySafeHashState(nextHash);
       render();
+      if (nextHash === safeGuideHash) scrollToSafeScenarioGuide();
     }
   });
 
   document.addEventListener('herown:data-ready', render);
 
   render();
+  if (initialHash === safeGuideHash) scrollToSafeScenarioGuide();
 }

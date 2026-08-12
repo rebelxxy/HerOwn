@@ -1,6 +1,7 @@
 export const SAVED_DAYS_KEY = "herOwnSavedDays";
 export const CURRENT_DAY_DRAFT_KEY = "herOwnCurrentDayDraft";
 export const SAVED_GUIDES_KEY = "herOwnSavedGuides";
+export const LIVING_PROGRESS_KEY = "herOwnLivingStepProgress";
 export const SAVED_PLACES_KEY = "herOwnSavedPlaces";
 export const NOTES_KEY = "herOwnNotes";
 
@@ -221,6 +222,46 @@ export function persistSavedGuides(guideIds) {
     storage.setItem(SAVED_GUIDES_KEY, JSON.stringify(normalized));
   } catch (error) {
     console.warn("Could not save HER Living guides to localStorage.");
+  }
+
+  return normalized;
+}
+
+function normalizeLivingStepProgress(progress) {
+  if (!progress || typeof progress !== "object") return {};
+
+  return Object.fromEntries(
+    Object.entries(progress).map(([guideId, steps]) => {
+      const normalizedSteps = [...new Set((Array.isArray(steps) ? steps : [])
+        .map((step) => Number(step))
+        .filter((step) => Number.isInteger(step) && step >= 0))]
+        .sort((a, b) => a - b);
+      return [String(guideId), normalizedSteps];
+    }).filter(([, steps]) => steps.length)
+  );
+}
+
+export function loadLivingStepProgress() {
+  const storage = safeLocalStorage();
+  if (!storage) return {};
+
+  try {
+    return normalizeLivingStepProgress(JSON.parse(storage.getItem(LIVING_PROGRESS_KEY) || "{}"));
+  } catch (error) {
+    console.warn("Could not read HER Living checklist progress from localStorage.");
+    return {};
+  }
+}
+
+export function persistLivingStepProgress(progress) {
+  const storage = safeLocalStorage();
+  const normalized = normalizeLivingStepProgress(progress);
+  if (!storage) return normalized;
+
+  try {
+    storage.setItem(LIVING_PROGRESS_KEY, JSON.stringify(normalized));
+  } catch (error) {
+    console.warn("Could not save HER Living checklist progress to localStorage.");
   }
 
   return normalized;

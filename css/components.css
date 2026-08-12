@@ -23,7 +23,7 @@
   }
 
   .mobile-menu {
-    display: grid;
+    display: flex;
   }
 
   .hero-strip,
