@@ -22,7 +22,7 @@ import {
   toggleSafetyCallSound,
 } from './pages/safe.js';
 import { getLivingGuide, renderLiving } from './pages/living.js';
-import { renderPlaces } from './pages/places.js';
+import { bindPlacesMapEvents, renderPlaces } from './pages/places.js';
 import { createAdditionalDayStop, createCurrentDayPlan, createDayPlanApiPayload, createDraftDayPlan, generateAdjustedDayPlan, getDayPlan, getDaySuggestion, normalizeSuggestionPlan, reflowDayPlan, renderDay } from './pages/day.js';
 import { renderMy } from './pages/my.js';
 import { pageShell } from './components/layout.js';
@@ -758,6 +758,7 @@ function updateSafeRouteManualField(field, value) {
 }
 
 function bindPageEvents() {
+  bindPlacesMapEvents(app);
   app.querySelectorAll("[data-page]").forEach((button) => {
     button.addEventListener("click", () => navigate(button.dataset.page));
   });

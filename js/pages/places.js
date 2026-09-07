@@ -1,9 +1,12 @@
 import { state, PICTURE_ROOT } from '../state.js';
-import { categoryIcons, categoryMap, placeCategories, placeExperienceFilters } from '../data.js';
+import { categoryMap, placeCategories, placeExperienceFilters } from '../data.js';
 import { labelFor, t, tf } from '../i18n.js';
 import { pageShell } from '../components/layout.js';
 import { filterChip } from '../components/cards.js';
 import { buildGoogleMapsLocationUrl } from '../utils/maps.js';
+
+let mapView = 'map';
+let mapZoom = 1;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -47,34 +50,65 @@ const stationKeys = {
   Ueno: "placeStationUeno",
 };
 
-function catalogIndex(place) {
-  return state.catalogs.places.findIndex((item) => item.id === place?.id);
+const categoryIconPaths = {
+  Cafe: `
+    <path d="M5 9h10v4.6A4.4 4.4 0 0 1 10.6 18H9.4A4.4 4.4 0 0 1 5 13.6V9Z" />
+    <path d="M15 10h2.1a2.5 2.5 0 0 1 0 5H15" />
+    <path d="M4 20h13" />
+    <path d="M8 6.2c-.8-1 .8-1.7 0-2.8M11 6.2c-.8-1 .8-1.7 0-2.8" />
+  `,
+  Bookstore: `
+    <path d="M4.5 5.7A2.7 2.7 0 0 1 7.2 3H12v16H7.2a2.7 2.7 0 0 0-2.7 2.7V5.7Z" />
+    <path d="M19.5 5.7A2.7 2.7 0 0 0 16.8 3H12v16h4.8a2.7 2.7 0 0 1 2.7 2.7V5.7Z" />
+    <path d="M15.5 6.5h2" />
+  `,
+  Restaurant: `
+    <ellipse cx="12" cy="14.5" rx="7.5" ry="3.5" />
+    <path d="M4.5 14.5c.6 3.5 3.2 5.2 7.5 5.2s6.9-1.7 7.5-5.2" />
+    <path d="M5 9.5h14M7.5 7.1h9" />
+  `,
+  "Flower Shop": `
+    <path d="M12 11v9M8.7 20h6.6" />
+    <path d="M12 11c-3.8 0-5.5-2.2-4.1-4.2 1.2-1.7 3.6-.9 4.1 1.7.5-2.6 2.9-3.4 4.1-1.7 1.4 2-.3 4.2-4.1 4.2Z" />
+    <path d="M12 11c0-3.1 2.2-4.9 4.2-3.6 1.8 1.2 1.1 3.7-1.4 4.5 2.5-.8 4.2 1.2 3.1 3-1 1.7-3.6 1.4-4.8-.9" />
+    <path d="M12 15c-1.1-2.3-3.8-2.6-4.8-.9-1.1 1.8.6 3.8 3.1 3" />
+  `,
+  Park: `
+    <path d="M12 4v16M8.5 20h7" />
+    <path d="M12 5.5c-2.8-2.3-6.2-.4-5.5 2.5-2.8.4-3.2 4.1-.9 5.2-1.2 2.7 2.2 4.9 4.5 3.1 1.9 2.4 5.4.8 4.8-1.9 2.6-.9 2.1-4.7-.6-5.1.7-2.9-2.2-4.8-4.3-3.8Z" />
+  `,
+  Museum: `
+    <path d="M3.5 9.5h17M5.5 9.5v9M9 9.5v9M15 9.5v9M18.5 9.5v9M3.5 18.5h17" />
+    <path d="m4 7 8-4 8 4v2H4V7Z" />
+  `,
+  Activity: `
+    <path d="m12 3 1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6L12 3Z" />
+    <path d="M19 17v4M17 19h4" />
+  `,
+  Gym: `
+    <path d="M4 10v4M7 8v8M17 8v8M20 10v4M7 12h10" />
+    <path d="M3 10h2v4H3zM19 10h2v4h-2z" />
+  `,
+};
+
+function categoryIconMarkup(category, className = "") {
+  const path = categoryIconPaths[category] || categoryIconPaths.Activity;
+  return `<svg class="category-icon ${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
 }
 
-function placeImage(place, index = null) {
-  const fallbackImages = ["037_place_01.png", "038_place_02.png", "039_place_03.png", "040_place_04.png", "041_place_05.png"];
-  const fallbackIndex = Number.isInteger(index) ? index : catalogIndex(place);
-  const safeIndex = fallbackIndex >= 0 ? fallbackIndex : 0;
-  return `${PICTURE_ROOT}${place.image || fallbackImages[safeIndex % fallbackImages.length]}`;
+function placeImageSrc(place) {
+  return place?.image ? `${PICTURE_ROOT}${place.image}` : "";
 }
 
-function popoverVisual(place) {
-  const categoryImageMap = {
-    Cafe: "037_place_01.png",
-    Bookstore: "038_place_02.png",
-    "Flower Shop": "039_place_03.png",
-    Park: "040_place_04.png",
-    Museum: "041_place_05.png",
-  };
-  const expectedImage = categoryImageMap[place?.category];
-
-  if (expectedImage && place?.image === expectedImage) {
-    return `<img class="popover-place-image" src="${PICTURE_ROOT}${expectedImage}" alt="" />`;
+function placeVisualMarkup(place, className, fallbackClass = "") {
+  const imageSrc = placeImageSrc(place);
+  if (imageSrc) {
+    return `<img class="${className}" src="${escapeHtml(imageSrc)}" alt="" />`;
   }
 
   return `
-    <div class="popover-category-icon" aria-hidden="true">
-      ${categoryIcons[place?.category] || "⌖"}
+    <div class="${className} place-visual-fallback ${fallbackClass}" aria-hidden="true">
+      ${categoryIconMarkup(place?.category, "place-fallback-icon")}
     </div>
   `;
 }
@@ -202,11 +236,11 @@ function emptyMessage(rawQuery, hasSearch, hasCategoryLimit, activeExperiences) 
   return t("placesNoPlaces");
 }
 
-function placeCard(place, index, selected) {
+function placeCard(place, selected) {
   const selectedClass = selected ? " is-selected" : "";
   return `
     <button class="mini-card place-pick places-mvp-card${selectedClass}" type="button" data-place="${escapeHtml(place.id)}">
-      <img class="mini-thumb image-thumb" src="${placeImage(place, index)}" alt="" />
+      ${placeVisualMarkup(place, "mini-thumb image-thumb", "place-card-visual")}
       <div class="places-card-copy">
         <strong>${escapeHtml(place.name)}</strong>
         <p>${escapeHtml(placeMeta(place))}</p>
@@ -271,39 +305,50 @@ function mapPanel(visiblePlaces, selected) {
 
   if (!visiblePlaces.length) {
     return `
-      <section class="map-panel product-map places-prototype-map ${areaClass(activeArea)}" aria-label="${escapeHtml(`${t("mapsPrototypeMap")} ${areaLabel(activeArea)}`)}">
-        <img class="map-art" src="${PICTURE_ROOT}035_ui_map_panel.png" alt="" />
-        ${mapBadges(activeArea)}
-        <p class="map-disclosure">${t("mapsIllustrativeDisclosure")}</p>
+      <div class="places-map-shell">
+        <section class="map-panel product-map places-prototype-map ${areaClass(activeArea)}" aria-label="${escapeHtml(`${t("mapsPrototypeMap")} ${areaLabel(activeArea)}`)}">
+          <img class="map-art" src="${PICTURE_ROOT}places-map-background.png" alt="" />
+          ${mapBadges(activeArea)}
+          <p class="map-disclosure">${t("mapsIllustrativeDisclosure")}</p>
+        </section>
         <article class="map-place-popover places-empty-popover">
           <div>
             <h3>${t("mapsUnavailable")}</h3>
             <p>${t("placesMapEmptyCopy")}</p>
           </div>
         </article>
-      </section>
+      </div>
     `;
   }
 
   const selectedMapsUrl = mapUrlForPlace(selected);
 
   return `
-    <section class="map-panel product-map places-prototype-map ${areaClass(activeArea)}" aria-label="${escapeHtml(`${t("mapsPrototypeMap")} ${areaLabel(activeArea)}`)}">
-      <img class="map-art" src="${PICTURE_ROOT}035_ui_map_panel.png" alt="" />
-      ${mapBadges(activeArea)}
-      ${mapPlaces
-        .map((place) => `
-          <button class="map-pin place-pin ${selected && place.id === selected.id ? "is-selected" : ""}" type="button" data-place="${escapeHtml(place.id)}" style="${escapeHtml(pinStyle(place))}" aria-label="${escapeHtml(`${place.name}, ${areaLabel(place.area)}`)}">
-            ${categoryIcons[place.category] || "⌖"}
-          </button>
-        `)
-        .join("")}
-      <p class="map-disclosure">${t("mapsIllustrativeDisclosure")}</p>
+    <div class="places-map-shell">
+      <section class="map-panel product-map places-prototype-map ${areaClass(activeArea)}" aria-label="${escapeHtml(`${t("mapsPrototypeMap")} ${areaLabel(activeArea)}`)}">
+        <div class="places-map-scene" style="--map-zoom: ${mapZoom}">
+          <img class="map-art" src="${PICTURE_ROOT}places-map-background.png" alt="" />
+          <div class="places-map-markers">
+            ${mapPlaces.map((place) => `
+              <button class="map-pin place-pin ${selected && place.id === selected.id ? "is-selected" : ""}" type="button" data-place="${escapeHtml(place.id)}" style="${escapeHtml(pinStyle(place))}" aria-pressed="${Boolean(selected && place.id === selected.id)}" aria-label="${escapeHtml(`${place.name}, ${areaLabel(place.area)}`)}" title="${escapeHtml(place.name)}">
+                ${placeVisualMarkup(place, "map-pin-art")}
+              </button>
+            `).join("")}
+          </div>
+        </div>
+        ${mapBadges(activeArea)}
+        <div class="places-map-controls">
+          ${mapControl('reset', 'rotate-ccw', 'placesMapReset')}
+          ${mapControl('in', 'plus', 'placesMapZoomIn')}
+          ${mapControl('out', 'minus', 'placesMapZoomOut')}
+        </div>
+        <p class="map-disclosure">${t("mapsIllustrativeDisclosure")}</p>
+      </section>
       ${
         selected
           ? `
             <article class="map-place-popover places-map-card">
-              ${popoverVisual(selected)}
+              ${placeVisualMarkup(selected, "popover-place-image", "popover-place-visual")}
               <div>
                 <h3>${escapeHtml(selected.name)}</h3>
                 <p>${escapeHtml(placeMeta(selected, { includeDistance: false }))}</p>
@@ -318,8 +363,49 @@ function mapPanel(visiblePlaces, selected) {
           `
           : ""
       }
-    </section>
+    </div>
   `;
+}
+
+function mapControl(action, icon, labelKey) {
+  return `<button type="button" data-map-zoom="${action}" title="${t(labelKey)}" aria-label="${t(labelKey)}"${(action === 'in' && mapZoom >= 1.4) || (action === 'out' && mapZoom <= 1) ? ' disabled' : ''}><img src="${PICTURE_ROOT}map-control-${icon}.svg" alt="" /></button>`;
+}
+
+function mapToolbar() {
+  return `
+    <div class="places-map-toolbar">
+      <div class="places-view-switch" role="group" aria-label="${t('placesMapViewLabel')}">
+        <button type="button" data-places-view="map" aria-pressed="${mapView === 'map'}">${t('placesMapView')}</button>
+        <button type="button" data-places-view="list" aria-pressed="${mapView === 'list'}">${t('placesListView')}</button>
+      </div>
+      <form class="search-bar places-search" data-place-search-form>
+        <input type="search" name="placeSearch" value="${escapeHtml(state.placeSearch)}" placeholder="${t('placesSearchPlaceholder')}" aria-label="${t('placesSearchA11y')}" />
+        <button type="submit" aria-label="${t('placesSearchA11y')}" title="${t('placesSearchA11y')}"><img src="${PICTURE_ROOT}map-control-search.svg" alt="" /></button>
+      </form>
+    </div>
+  `;
+}
+
+// Presentation-only controls retain the existing catalog, filter and selection state.
+export function bindPlacesMapEvents(root) {
+  root.querySelectorAll('[data-places-view]').forEach((button) => {
+    button.addEventListener('click', () => {
+      mapView = button.dataset.placesView;
+      root.querySelector('.places-explorer').dataset.view = mapView;
+      root.querySelectorAll('[data-places-view]').forEach((option) => {
+        option.setAttribute('aria-pressed', String(option.dataset.placesView === mapView));
+      });
+    });
+  });
+  root.querySelectorAll('[data-map-zoom]').forEach((button) => {
+    button.addEventListener('click', () => {
+      mapZoom = button.dataset.mapZoom === 'reset' ? 1 : Math.min(1.4, Math.max(1, Number((mapZoom + (button.dataset.mapZoom === 'in' ? 0.2 : -0.2)).toFixed(1))));
+      root.querySelector('.places-map-scene')?.style.setProperty('--map-zoom', mapZoom);
+      root.querySelectorAll('[data-map-zoom]').forEach((control) => {
+        control.disabled = (control.dataset.mapZoom === 'in' && mapZoom >= 1.4) || (control.dataset.mapZoom === 'out' && mapZoom <= 1);
+      });
+    });
+  });
 }
 
 function detailPanel(selected) {
@@ -348,7 +434,7 @@ function detailPanel(selected) {
           <h2>${escapeHtml(selected.name)}</h2>
           <p>${escapeHtml(selected.description || selected.reason || "")}</p>
         </div>
-        <img src="${placeImage(selected)}" alt="" />
+        ${placeVisualMarkup(selected, "places-detail-image", "places-detail-visual")}
       </div>
       <div class="places-detail-grid">
         <div>
@@ -442,11 +528,6 @@ export function renderPlaces() {
       <img src="images/herplace.png" alt="" />
     </div>
     <div class="places-product places-mvp">
-      <form class="search-bar places-search" data-place-search-form>
-        <input type="search" name="placeSearch" value="${escapeHtml(state.placeSearch)}" placeholder="${t("placesSearchPlaceholder")}" aria-label="${t("placesSearchA11y")}" />
-        <button type="submit" aria-label="${t("placesSearchA11y")}">⌕</button>
-      </form>
-
       <section class="surface places-filter-panel">
         <div class="places-filter-head">
           <div>
@@ -487,6 +568,8 @@ export function renderPlaces() {
         }
       </section>
 
+      <div class="places-explorer" data-view="${mapView}">
+      ${mapToolbar()}
       <div class="places-map-layout places-mvp-layout">
         <section class="surface places-list-panel">
           <div class="places-subhead">
@@ -497,7 +580,7 @@ export function renderPlaces() {
             visiblePlaces.length
               ? `
                 <div class="places-card-list">
-                  ${visiblePlaces.map((place, index) => placeCard(place, index, selected && place.id === selected.id)).join("")}
+                  ${visiblePlaces.map((place) => placeCard(place, selected && place.id === selected.id)).join("")}
                 </div>
               `
               : `
@@ -513,6 +596,7 @@ export function renderPlaces() {
           }
         </section>
         ${mapPanel(visiblePlaces, selected)}
+      </div>
       </div>
 
       ${detailPanel(selected)}

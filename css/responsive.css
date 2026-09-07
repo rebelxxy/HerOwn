@@ -631,26 +631,77 @@
     max-width: calc(100% - 24px);
   }
 
-  .places-prototype-map .places-map-card {
-    right: 12px;
-    bottom: 12px;
-    grid-template-columns: 56px minmax(0, 1fr);
-    width: calc(100% - 24px);
+  .places-map-shell {
+    display: grid;
+    gap: 12px;
   }
 
-  .places-prototype-map .places-map-card .popover-place-image {
-    width: 56px;
-    height: 48px;
+  .places-prototype-map {
+    min-height: 370px;
   }
 
-  .places-prototype-map .places-map-card .popover-category-icon {
-    width: 56px;
-    height: 48px;
-    font-size: 20px;
+  .places-map-markers {
+    inset: 94px 46px 30px 0;
+  }
+
+  .places-prototype-map .map-disclosure {
+    max-width: calc(100% - 20px);
+  }
+
+  .places-prototype-map .place-pin {
+    width: 40px;
+    height: 40px;
+    padding: 4px;
+  }
+
+  .places-map-toolbar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .places-map-toolbar .places-search {
+    width: 100%;
+  }
+
+  .places-explorer[data-view="list"] .places-card-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .places-map-shell .places-map-card {
+    position: static;
+    right: auto;
+    bottom: auto;
+    grid-template-columns: 72px minmax(0, 1fr);
+    width: 100%;
+    max-width: 100%;
+    box-shadow: none;
+  }
+
+  .places-map-shell .map-popover-link {
+    grid-column: 2;
+  }
+
+  .places-map-shell .places-map-card .popover-place-image,
+  .places-map-shell .places-map-card .popover-place-visual {
+    width: 72px;
+    height: 72px;
+  }
+
+  .places-map-shell .places-map-card .place-fallback-icon {
+    width: 28px;
+    height: 28px;
   }
 
   .places-empty-popover {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1120px) {
+  .places-map-shell .places-map-card {
+    width: min(320px, calc(100% - 24px));
+    right: 12px;
+    bottom: 12px;
   }
 }
 
