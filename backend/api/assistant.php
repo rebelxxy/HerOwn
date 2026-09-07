@@ -24,15 +24,17 @@ function configureCors(): bool
 {
     $allowedOrigins = [
         'https://rebelxxy.github.io',
+        'https://xinyang-xiao.github.io',
         'http://127.0.0.1:8000',
         'http://localhost:8000',
     ];
     $configuredOrigins = getenv('HER_OWN_ALLOWED_ORIGINS') ?: '';
     if (trim($configuredOrigins) !== '') {
-        $allowedOrigins = array_values(array_filter(array_map(
+        $environmentOrigins = array_filter(array_map(
             static fn (string $origin): string => rtrim(trim($origin), '/'),
             explode(',', $configuredOrigins)
-        )));
+        ));
+        $allowedOrigins = array_values(array_unique(array_merge($allowedOrigins, $environmentOrigins)));
     }
 
     $origin = rtrim((string) ($_SERVER['HTTP_ORIGIN'] ?? ''), '/');
