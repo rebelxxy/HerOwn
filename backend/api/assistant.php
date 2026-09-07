@@ -20,6 +20,44 @@ function sendError(string $message, int $statusCode = 500): void
     sendJson(['success' => false, 'message' => $message], $statusCode);
 }
 
+function configureCors(): bool
+{
+    $allowedOrigins = [
+        'https://rebelxxy.github.io',
+        'http://127.0.0.1:8000',
+        'http://localhost:8000',
+    ];
+    $configuredOrigins = getenv('HER_OWN_ALLOWED_ORIGINS') ?: '';
+    if (trim($configuredOrigins) !== '') {
+        $allowedOrigins = array_values(array_filter(array_map(
+            static fn (string $origin): string => rtrim(trim($origin), '/'),
+            explode(',', $configuredOrigins)
+        )));
+    }
+
+    $origin = rtrim((string) ($_SERVER['HTTP_ORIGIN'] ?? ''), '/');
+    $originAllowed = $origin === '' || in_array($origin, $allowedOrigins, true);
+
+    header('Vary: Origin');
+    if ($origin !== '' && $originAllowed) {
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type');
+        header('Access-Control-Max-Age: 600');
+    }
+
+    return $originAllowed;
+}
+
+$originAllowed = configureCors();
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
+    if (!$originAllowed) {
+        sendError('Origin not allowed.', 403);
+    }
+    http_response_code(204);
+    exit;
+}
+
 function readJsonBody(): array
 {
     $rawBody = file_get_contents('php://input');
