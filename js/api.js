@@ -5,7 +5,7 @@ import {
   safetyGuides as localSafetyGuides,
   savedDayPlans as localSavedDayPlans,
 } from './data.js';
-import { USE_REMOTE_DATA_API } from './config.js';
+import { ASSISTANT_API_URL, USE_REMOTE_DATA_API } from './config.js';
 
 const API_ROOT = new URL('../backend/api/', import.meta.url);
 const FALLBACK_MESSAGE = 'API unavailable, using local fallback data.';
@@ -388,7 +388,7 @@ export async function askAssistant(message, context = {}) {
   const lang = context.lang || 'en';
   const history = Array.isArray(context.history) ? context.history : [];
   try {
-    const data = await request('assistant.php', {
+    const data = await request(ASSISTANT_API_URL, {
         method: 'POST',
         body: JSON.stringify({
           message,
