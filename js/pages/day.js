@@ -737,7 +737,7 @@ export function renderDay() {
     <div class="day-head-product">
       <div>
         <p class="eyebrow">${t("dayTitle")}</p>
-        <h1 class="section-title">${t("dayTitle")}</h1>
+        <h1 class="section-title" lang="en">${t("dayTitle")}</h1>
         <p class="section-copy">${t("daySubtitle")}</p>
       </div>
       <img src="images/herday.png" alt="" />

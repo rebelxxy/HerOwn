@@ -333,5 +333,5 @@ export function renderMy() {
         ${tabContent}
       </section>
     </div>
-  `);
+  `, "my-page");
 }

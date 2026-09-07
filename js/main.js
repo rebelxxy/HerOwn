@@ -6,7 +6,7 @@ import {
   fetchPlaces,
   fetchSafetyGuides,
 } from './api.js';
-import { initRouter } from './router.js';
+import { initRouter } from './router.js?v=20260907-ja-type-3';
 import { state } from './state.js';
 import { loadCurrentDayDraft, loadSavedDays, loadSavedPlaces, mergeDayPlans } from './storage.js';
 

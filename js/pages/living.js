@@ -356,7 +356,7 @@ export function renderLiving() {
     <div class="living-head-product">
       <div>
         <p class="eyebrow">HER OWN</p>
-        <h1 class="section-title">HER Living</h1>
+        <h1 class="section-title" lang="en">HER Living</h1>
         <p class="section-copy">${htmlEscape(t("livingSubtitle"))}</p>
       </div>
       <img src="images/living.png" alt="" />

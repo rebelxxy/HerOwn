@@ -521,7 +521,7 @@ export function renderPlaces() {
     <div class="places-head-product">
       <div>
         <p class="eyebrow">${t("placesHeroEyebrow")}</p>
-        <h1 class="section-title">${t("placesTitle")}</h1>
+        <h1 class="section-title" lang="en">${t("placesTitle")}</h1>
         <p class="section-copy">${t("placesHeroCopy")}</p>
         <p class="product-hero-note">${t("placesHeroNote")}</p>
       </div>

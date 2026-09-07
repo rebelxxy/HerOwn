@@ -38,7 +38,8 @@ function stopCountLabel(count) {
 }
 
 function welcomeMarkup() {
-  return escapeHtml(t("homeWelcome")).replace(/\s+/, "<br />");
+  const words = t("homeWelcome").trim().split(/\s+/);
+  return words.map((word) => `<span>${escapeHtml(word)}</span>`).join(" ");
 }
 
 function firstTodaySuggestion() {
@@ -66,11 +67,11 @@ function renderGoIntent() {
       </div>
       <div class="home-choice-list">
         <button class="soft-button home-choice-button" type="button" data-page="day">
-          <span>HER Day</span>
+          <span class="product-name" lang="en">HER Day</span>
           <small>${t("homeIntentDayChoice")}</small>
         </button>
         <button class="soft-button home-choice-button" type="button" data-page="places">
-          <span>HER Places</span>
+          <span class="product-name" lang="en">HER Places</span>
           <small>${t("homeIntentPlacesChoice")}</small>
         </button>
       </div>
@@ -154,7 +155,7 @@ function renderLittleEasier() {
 
         <article class="surface home-editorial-card">
           <p class="eyebrow">${t("homePlacesEyebrow")}</p>
-          <h3>${escapeHtml(place?.name || t("homePlacesTitle"))}</h3>
+          <h3 class="place-name" lang="en">${escapeHtml(place?.name || t("homePlacesTitle"))}</h3>
           <p>${escapeHtml(place?.reason || place?.description || t("homePlacesDefaultCopy"))}</p>
           ${place ? `<img class="home-place-thumb" src="${PICTURE_ROOT}${escapeHtml(place.image || "037_place_01.png")}" alt="" />` : ""}
           <div class="home-tag-row">
@@ -180,7 +181,7 @@ export function renderHome() {
       <div class="hero-inner">
         <div class="hero-copy home-hero-copy-v2">
           <p class="eyebrow">${t(greetingKey())}</p>
-          <h1>${welcomeMarkup()}</h1>
+          <h1 lang="en">${welcomeMarkup()}</h1>
           <p class="home-confidence-line">${t("homeConfidenceLine")}</p>
           <p class="home-hero-question">${t("homeNeedToday")}</p>
         </div>
@@ -201,7 +202,10 @@ export function renderHome() {
       <section class="home-brand-moment" aria-label="${t("homeBrandLabel")}">
         <div class="home-brand-copy">
           <p class="eyebrow">${t("homeBrandLabel")}</p>
-          <blockquote>${t("homeBrandLine1")}<br />${t("homeBrandLine2")}</blockquote>
+          <blockquote>
+            <span>${t("homeBrandLine1")}</span>
+            <span>${t("homeBrandLine2")}</span>
+          </blockquote>
         </div>
         <div class="home-brand-visual" aria-hidden="true">
           <img src="${PICTURE_ROOT}0074.png" alt="" />

@@ -3,7 +3,7 @@ import { renderStaticText, t } from './i18n.js';
 import { saveDayPlan, saveFavoritePlace } from './api.js';
 import { clearCurrentDayDraft, hasSavedDayPlan, mergeDayPlans, persistCurrentDayDraft, persistLivingStepProgress, persistLocationEnabled, persistNotes, persistSavedDays, persistSavedGuides, persistSavedPlaces } from './storage.js';
 import { renderAssistant } from './components/assistant.js';
-import { renderHome } from './pages/home.js';
+import { renderHome } from './pages/home.js?v=20260907-ja-type-3';
 import {
   acceptSafetyCall,
   cancelSafetyCall,
@@ -21,10 +21,10 @@ import {
   startSafetyCallCountdown,
   toggleSafetyCallSound,
 } from './pages/safe.js';
-import { getLivingGuide, renderLiving } from './pages/living.js';
-import { bindPlacesMapEvents, renderPlaces } from './pages/places.js';
-import { createAdditionalDayStop, createCurrentDayPlan, createDayPlanApiPayload, createDraftDayPlan, generateAdjustedDayPlan, getDayPlan, getDaySuggestion, normalizeSuggestionPlan, reflowDayPlan, renderDay } from './pages/day.js';
-import { renderMy } from './pages/my.js';
+import { getLivingGuide, renderLiving } from './pages/living.js?v=20260907-ja-type-2';
+import { bindPlacesMapEvents, renderPlaces } from './pages/places.js?v=20260907-ja-type-2';
+import { createAdditionalDayStop, createCurrentDayPlan, createDayPlanApiPayload, createDraftDayPlan, generateAdjustedDayPlan, getDayPlan, getDaySuggestion, normalizeSuggestionPlan, reflowDayPlan, renderDay } from './pages/day.js?v=20260907-ja-type-2';
+import { renderMy } from './pages/my.js?v=20260907-ja-type-3';
 import { pageShell } from './components/layout.js';
 import { daySuggestions } from './data.js';
 
