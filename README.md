@@ -59,6 +59,20 @@ http://localhost:8000
 
 The front-end prototype does not require PHP, MySQL, or any build tool.
 
+## Add to Home Screen
+
+HER OWN includes a lightweight Web App Manifest for GitHub Pages project sites.
+It uses relative `start_url` and `scope` values, so the installed app works when
+the repository is hosted below a project path instead of the domain root.
+
+- App manifest: `manifest.webmanifest`
+- App icons: `assets/icons/icon-192.png`, `assets/icons/icon-512.png`, and `assets/icons/apple-touch-icon.png`
+- No service worker is registered. Assistant responses, PHP API responses, and user-specific data are not cached.
+
+On iPhone, open the deployed GitHub Pages URL in Safari, tap Share, choose **Add
+to Home Screen**, keep the name `HER OWN`, and tap Add. On Android Chrome, open
+the site menu and choose **Install app** or **Add to Home screen**.
+
 ## Backend Preparation
 
 The `/backend` directory contains a prepared PHP API structure for a future full-stack version.
