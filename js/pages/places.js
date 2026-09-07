@@ -1,6 +1,6 @@
 import { state, PICTURE_ROOT } from '../state.js';
 import { categoryIcons, categoryMap, placeCategories, placeExperienceFilters } from '../data.js';
-import { t } from '../i18n.js';
+import { labelFor, t, tf } from '../i18n.js';
 import { pageShell } from '../components/layout.js';
 import { filterChip } from '../components/cards.js';
 import { buildGoogleMapsLocationUrl } from '../utils/maps.js';
@@ -46,12 +46,6 @@ const stationKeys = {
   Shimokitazawa: "placeStationShimokitazawa",
   Ueno: "placeStationUeno",
 };
-
-function formatText(key, values = {}) {
-  return Object.entries(values).reduce((text, [name, value]) => {
-    return text.replaceAll(`{${name}}`, value);
-  }, t(key));
-}
 
 function catalogIndex(place) {
   return state.catalogs.places.findIndex((item) => item.id === place?.id);
@@ -118,7 +112,7 @@ function stationLabel(place) {
 function distanceLabel(place) {
   if (!place?.distance) return "";
   const point = stationLabel(place);
-  return point ? formatText("placesDistanceFrom", { distance: place.distance, point }) : place.distance;
+  return point ? tf("placesDistanceFrom", { distance: place.distance, point }) : place.distance;
 }
 
 function placeMeta(place, options = {}) {
@@ -149,7 +143,7 @@ function matchesExperience(place, activeExperiences) {
 
 function tagMarkup(tags) {
   return tags.length
-    ? `<div class="tag-row">${tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>`
+    ? `<div class="tag-row">${tags.map((tag) => `<span class="tag">${escapeHtml(labelFor(tag))}</span>`).join("")}</div>`
     : "";
 }
 
@@ -162,7 +156,7 @@ function experienceFilterMarkup(activeExperiences) {
   return `
     <div class="filter-list horizontal places-experience-list">
       ${primaryFilters
-        .map((filter) => filterChip(filter, activeExperiences.includes(filter), `data-place-experience="${escapeHtml(filter)}"`))
+        .map((filter) => filterChip(labelFor(filter), activeExperiences.includes(filter), `data-place-experience="${escapeHtml(filter)}"`))
         .join("")}
       ${
         overflowFilters.length
@@ -174,7 +168,7 @@ function experienceFilterMarkup(activeExperiences) {
               </summary>
               <div class="places-more-filter-list">
                 ${overflowFilters
-                  .map((filter) => filterChip(filter, activeExperiences.includes(filter), `data-place-experience="${escapeHtml(filter)}"`))
+                  .map((filter) => filterChip(labelFor(filter), activeExperiences.includes(filter), `data-place-experience="${escapeHtml(filter)}"`))
                   .join("")}
               </div>
             </details>
@@ -193,17 +187,19 @@ function reasonMarkup(place) {
         ${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}
       </ul>
     `
-    : `<p>${escapeHtml(place.reason || "Recommended for a gentle solo visit.")}</p>`;
+    : `<p>${escapeHtml(place.reason || t("placesFallbackReason"))}</p>`;
 }
 
 function emptyMessage(rawQuery, hasSearch, hasCategoryLimit, activeExperiences) {
-  if (hasSearch) return `No place found for “${escapeHtml(rawQuery)}”.`;
+  const experience = activeExperiences.map(labelFor).join(", ");
+  const category = labelFor(state.selectedPlaceCategory);
+  if (hasSearch) return tf("placesNoSearchResults", { query: rawQuery });
   if (hasCategoryLimit && activeExperiences.length) {
-    return `No place found for ${escapeHtml(activeExperiences.join(", "))} in ${escapeHtml(state.selectedPlaceCategory)}.`;
+    return tf("placesNoCategoryExperienceResults", { experience, category });
   }
-  if (hasCategoryLimit) return `No place found in ${escapeHtml(state.selectedPlaceCategory)}.`;
-  if (activeExperiences.length) return `No place found for ${escapeHtml(activeExperiences.join(", "))}.`;
-  return "No places available yet.";
+  if (hasCategoryLimit) return tf("placesNoCategoryResults", { category });
+  if (activeExperiences.length) return tf("placesNoExperienceResults", { experience });
+  return t("placesNoPlaces");
 }
 
 function placeCard(place, index, selected) {
@@ -330,9 +326,9 @@ function detailPanel(selected) {
   if (!selected) {
     return `
       <article class="surface place-detail-panel places-empty-detail">
-        <p class="eyebrow">Place detail</p>
-        <h2>Select a place</h2>
-        <p>Choose a card to see why it might fit your solo day.</p>
+        <p class="eyebrow">${t("placesDetailEyebrow")}</p>
+        <h2>${t("placesSelectPlaceTitle")}</h2>
+        <p>${t("placesSelectPlaceCopy")}</p>
       </article>
     `;
   }
@@ -356,24 +352,24 @@ function detailPanel(selected) {
       </div>
       <div class="places-detail-grid">
         <div>
-          <strong>Opening hours</strong>
-          <span>${escapeHtml(selected.openingHours || selected.hours || "Prototype hours")}</span>
+          <strong>${t("placesOpeningHours")}</strong>
+          <span>${escapeHtml(selected.openingHours || selected.hours || t("placesPrototypeHours"))}</span>
         </div>
         <div>
-          <strong>Price range</strong>
-          <span>${escapeHtml(selected.priceRange || selected.budget || "Prototype price")}</span>
+          <strong>${t("placesPriceRange")}</strong>
+          <span>${escapeHtml(selected.priceRange || selected.budget || t("placesPrototypePrice"))}</span>
         </div>
       </div>
       <div class="places-detail-block places-experience-tags">
-        <strong>Experience tags</strong>
+        <strong>${t("placesExperienceTags")}</strong>
         ${tagMarkup(experienceTags)}
       </div>
       <div class="places-detail-block places-practical-tags">
-        <strong>Practical tags</strong>
+        <strong>${t("placesPracticalTags")}</strong>
         ${tagMarkup(practicalTags)}
       </div>
       <div class="places-detail-block">
-        <strong>Why recommended</strong>
+        <strong>${t("placesWhyRecommended")}</strong>
         ${reasonMarkup(selected)}
       </div>
       ${
@@ -390,13 +386,13 @@ function detailPanel(selected) {
         ${
           saved
             ? `<button class="soft-button is-saved" type="button" disabled>${t("placesSaved")}</button>`
-            : `<button class="soft-button" type="button" data-save-place="${escapeHtml(selected.id)}">Save Place</button>`
+            : `<button class="soft-button" type="button" data-save-place="${escapeHtml(selected.id)}">${t("placesSavePlace")}</button>`
         }
         <button class="soft-button" type="button" data-open-safe-route-place="${escapeHtml(selected.id)}">${t("safetyCallOpenSafeRoute")}</button>
         ${
           addedToDraft
-            ? `<button class="button is-saved" type="button" disabled>Added to HER Day</button>`
-            : `<button class="button" type="button" data-add-place-day="${escapeHtml(selected.id)}">Add to HER Day</button>`
+            ? `<button class="button is-saved" type="button" disabled>${t("placesAddedToDay")}</button>`
+            : `<button class="button" type="button" data-add-place-day="${escapeHtml(selected.id)}">${t("placesAddToDay")}</button>`
         }
         <button class="text-button places-back-action" type="button" data-place-back>${t("placesBackToResults")}</button>
       </div>
@@ -430,8 +426,8 @@ export function renderPlaces() {
   }
 
   const activeSummary = [
-    hasCategoryLimit || activeExperiences.length ? { label: "Category", values: [state.selectedPlaceCategory] } : null,
-    activeExperiences.length ? { label: "Experience", values: activeExperiences } : null,
+    hasCategoryLimit || activeExperiences.length ? { label: t("placesConditionCategory"), values: [labelFor(state.selectedPlaceCategory)] } : null,
+    activeExperiences.length ? { label: t("placesConditionExperience"), values: activeExperiences.map(labelFor) } : null,
   ].filter(Boolean);
   const noResultMessage = emptyMessage(rawQuery, hasSearch, hasCategoryLimit, activeExperiences);
 
@@ -447,28 +443,28 @@ export function renderPlaces() {
     </div>
     <div class="places-product places-mvp">
       <form class="search-bar places-search" data-place-search-form>
-        <input type="search" name="placeSearch" value="${escapeHtml(state.placeSearch)}" placeholder="Search by place, area, experience, or mood" aria-label="Search places" />
-        <button type="submit" aria-label="Search">⌕</button>
+        <input type="search" name="placeSearch" value="${escapeHtml(state.placeSearch)}" placeholder="${t("placesSearchPlaceholder")}" aria-label="${t("placesSearchA11y")}" />
+        <button type="submit" aria-label="${t("placesSearchA11y")}">⌕</button>
       </form>
 
       <section class="surface places-filter-panel">
         <div class="places-filter-head">
           <div>
-            <p class="eyebrow">Experience filters</p>
-            <h3>What kind of place feels right?</h3>
+            <p class="eyebrow">${t("placesExperienceFilters")}</p>
+            <h3>${t("placesExperiencePrompt")}</h3>
           </div>
           ${
             hasActiveFilters
-              ? `<button class="text-button" type="button" data-clear-place-filters>Clear filters</button>`
+              ? `<button class="text-button" type="button" data-clear-place-filters>${t("placesClearFilters")}</button>`
               : ""
           }
         </div>
         ${experienceFilterMarkup(activeExperiences)}
         <div class="places-filter-group">
-          <p class="eyebrow">Category filters</p>
+          <p class="eyebrow">${t("placesCategoryFilters")}</p>
           <div class="filter-list horizontal">
             ${placeCategories
-              .map((category) => filterChip(category, category === state.selectedPlaceCategory, `data-place-category="${escapeHtml(category)}"`))
+              .map((category) => filterChip(labelFor(category), category === state.selectedPlaceCategory, `data-place-category="${escapeHtml(category)}"`))
               .join("")}
           </div>
         </div>
@@ -476,15 +472,15 @@ export function renderPlaces() {
           activeSummary.length || hasSearch
             ? `
               <div class="active-filter-row">
-                <span>Current conditions</span>
+                <span>${t("placesCurrentConditions")}</span>
                 ${activeSummary.map((group) => `
                   <span class="condition-group">
                     <strong>${escapeHtml(group.label)}:</strong>
                     ${group.values.map((value) => `<span class="tag">${escapeHtml(value)}</span>`).join("")}
                   </span>
                 `).join("")}
-                ${hasSearch ? `<span class="tag">Search: ${escapeHtml(rawQuery)}</span>` : ""}
-                ${hasSearch ? `<button class="text-button" type="button" data-clear-place-search>Clear Search</button>` : ""}
+                ${hasSearch ? `<span class="tag">${t("placesConditionSearch")}: ${escapeHtml(rawQuery)}</span>` : ""}
+                ${hasSearch ? `<button class="text-button" type="button" data-clear-place-search>${t("placesClearSearch")}</button>` : ""}
               </div>
             `
             : ""
@@ -494,8 +490,8 @@ export function renderPlaces() {
       <div class="places-map-layout places-mvp-layout">
         <section class="surface places-list-panel">
           <div class="places-subhead">
-            <h3>${hasSearch ? `Search results for “${escapeHtml(rawQuery)}”` : "Places for you"}</h3>
-            <span class="pill">${visiblePlaces.length} places</span>
+            <h3>${hasSearch ? tf("placesSearchResultsFor", { query: rawQuery }) : t("placesForYou")}</h3>
+            <span class="pill">${tf("placesCount", { count: visiblePlaces.length })}</span>
           </div>
           ${
             visiblePlaces.length
@@ -506,11 +502,11 @@ export function renderPlaces() {
               `
               : `
                 <div class="surface living-empty-state places-empty-state">
-                  <strong>${noResultMessage}</strong>
-                  <p>Try another keyword, category, or experience filter.</p>
+                  <strong>${escapeHtml(noResultMessage)}</strong>
+                  <p>${t("placesEmptyHint")}</p>
                   <div class="button-row">
-                    ${hasSearch ? `<button class="text-button" type="button" data-clear-place-search>Clear Search</button>` : ""}
-                    ${hasActiveFilters ? `<button class="text-button" type="button" data-clear-place-filters>Clear filters</button>` : ""}
+                    ${hasSearch ? `<button class="text-button" type="button" data-clear-place-search>${t("placesClearSearch")}</button>` : ""}
+                    ${hasActiveFilters ? `<button class="text-button" type="button" data-clear-place-filters>${t("placesClearFilters")}</button>` : ""}
                   </div>
                 </div>
               `

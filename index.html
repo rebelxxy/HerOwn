@@ -15,20 +15,20 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="css/base.css?v=20260811-safe-freeze" />
-    <link rel="stylesheet" href="css/layout.css?v=20260811-safe-freeze" />
-    <link rel="stylesheet" href="css/components.css?v=20260811-safe-freeze" />
-    <link rel="stylesheet" href="css/pages.css?v=20260811-safe-freeze" />
-    <link rel="stylesheet" href="css/responsive.css?v=20260811-safe-freeze" />
+    <link rel="stylesheet" href="css/base.css?v=20260812-global-qa" />
+    <link rel="stylesheet" href="css/layout.css?v=20260812-global-qa" />
+    <link rel="stylesheet" href="css/components.css?v=20260812-global-qa" />
+    <link rel="stylesheet" href="css/pages.css?v=20260812-global-qa" />
+    <link rel="stylesheet" href="css/responsive.css?v=20260812-global-qa" />
   </head>
   <body>
     <div class="app-frame">
       <header class="topbar" id="topbar">
-        <button class="brand" type="button" data-page="home" aria-label="Go to home">
+        <button class="brand" type="button" data-page="home" aria-label="Go to home" data-i18n-aria-label="ariaGoHome">
           <span class="brand-mark">H</span>
           <span>HER OWN</span>
         </button>
-        <nav class="main-nav" aria-label="Primary navigation">
+        <nav class="main-nav" aria-label="Primary navigation" data-i18n-aria-label="ariaPrimaryNavigation">
           <button class="nav-link is-active" type="button" data-page="home">Home</button>
           <button class="nav-link" type="button" data-page="day">HER Day</button>
           <button class="nav-link" type="button" data-page="places">HER Places</button>
@@ -37,16 +37,16 @@
           <button class="nav-link" type="button" data-page="my">My Page</button>
         </nav>
         <div class="topbar-actions">
-          <button class="assistant-pill" type="button" aria-label="Open HER Assistant">
+          <button class="assistant-pill" type="button" aria-label="Open HER Assistant" data-i18n-aria-label="ariaOpenAssistant">
             <span data-i18n="assistantName">HER Assistant</span>
             <span aria-hidden="true">☏</span>
           </button>
-          <select class="language-select" id="languageSelect" aria-label="Language">
+          <select class="language-select" id="languageSelect" aria-label="Language" data-i18n-aria-label="ariaLanguage">
             <option value="en">EN</option>
             <option value="ja">日本語</option>
             <option value="zh">中文</option>
           </select>
-          <button class="mobile-menu" type="button" aria-label="Toggle menu">
+          <button class="mobile-menu" type="button" aria-label="Toggle menu" data-i18n-aria-label="ariaToggleMenu">
             <span></span>
             <span></span>
             <span></span>
@@ -56,32 +56,32 @@
 
       <main id="app" tabindex="-1"></main>
 
-      <button class="assistant-launch" type="button" aria-label="Open HER Assistant">
+      <button class="assistant-launch" type="button" aria-label="Open HER Assistant" data-i18n-aria-label="ariaOpenAssistant">
         <span>HER</span>
       </button>
 
-      <aside class="assistant-panel" id="assistantPanel" aria-label="HER Assistant" aria-hidden="true">
+      <aside class="assistant-panel" id="assistantPanel" aria-label="HER Assistant" aria-hidden="true" data-i18n-aria-label="assistantName">
         <div class="assistant-head">
           <div>
             <p class="eyebrow" data-i18n="assistantName">HER Assistant</p>
             <h2 data-i18n="assistantTitle">I'm here with you.</h2>
           </div>
-          <button class="icon-button assistant-close" type="button" aria-label="Close assistant">×</button>
+          <button class="icon-button assistant-close" type="button" aria-label="Close assistant" data-i18n-aria-label="ariaCloseAssistant">×</button>
         </div>
         <div class="assistant-log" id="assistantLog"></div>
-        <div class="assistant-prompts" aria-label="Suggested questions">
+        <div class="assistant-prompts" aria-label="Suggested questions" data-i18n-aria-label="ariaSuggestedQuestions">
           <button type="button" data-prompt="I feel like someone is following me." data-i18n="promptFollowed">Being followed</button>
           <button type="button" data-prompt="There is a stranger at my door." data-i18n="promptDoor">At my door</button>
           <button type="button" data-prompt="I want a gentle solo day today." data-i18n="promptSoloDay">Solo day</button>
         </div>
         <form class="assistant-form" id="assistantForm">
-          <input id="assistantInput" type="text" placeholder="Ask HER..." autocomplete="off" />
-          <button type="submit" aria-label="Send">↑</button>
+          <input id="assistantInput" type="text" placeholder="Ask HER..." autocomplete="off" data-i18n-placeholder="assistantInputPlaceholder" />
+          <button type="submit" aria-label="Send" data-i18n-aria-label="ariaSend">↑</button>
         </form>
       </aside>
 
     </div>
 
-    <script type="module" src="js/main.js?v=20260811-safe-freeze"></script>
+    <script type="module" src="js/main.js?v=0815-assistant-qa-2"></script>
   </body>
 </html>

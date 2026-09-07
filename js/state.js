@@ -9,10 +9,11 @@ import { loadCurrentDayDraft, loadLivingStepProgress, loadLocationEnabled, loadN
 
 const initialSavedPlaceIds = loadSavedPlaces() || favoritePlaceIds;
 const currentDayDraft = loadCurrentDayDraft();
+const initialLanguage = localStorage.getItem("herOwnLanguage") || "en";
 
 export const state = {
   page: "home",
-  lang: localStorage.getItem("herOwnLanguage") || "en",
+  lang: initialLanguage,
   user: {
     id: 1,
     name: "Xiao",
@@ -45,7 +46,6 @@ export const state = {
   safeRouteLocationStatus: "idle",
   safeRouteLocationError: "",
   safeRouteSavedPickerOpen: false,
-  sosRevealed: false,
   selectedLivingCategory: "",
   selectedGuide: "",
   livingSearch: "",
@@ -78,7 +78,8 @@ export const state = {
   assistantMessages: [
     {
       role: "assistant",
-      text: "Hi, I'm HER. If this is urgent, move toward people and call 110. Otherwise, tell me what is happening.",
+      text: "",
+      i18nKey: "assistantWelcome",
     },
   ],
   catalogs: {

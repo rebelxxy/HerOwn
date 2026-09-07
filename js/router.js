@@ -21,7 +21,6 @@ import {
   startSafetyCallCountdown,
   toggleSafetyCallSound,
 } from './pages/safe.js';
-import { renderSOS } from './pages/sos.js';
 import { getLivingGuide, renderLiving } from './pages/living.js';
 import { renderPlaces } from './pages/places.js';
 import { createAdditionalDayStop, createCurrentDayPlan, createDayPlanApiPayload, createDraftDayPlan, generateAdjustedDayPlan, getDayPlan, getDaySuggestion, normalizeSuggestionPlan, reflowDayPlan, renderDay } from './pages/day.js';
@@ -33,7 +32,7 @@ const app = document.querySelector('#app');
 const navLinks = [...document.querySelectorAll('.nav-link[data-page], .icon-button[data-page]')];
 const mainNav = document.querySelector('.main-nav');
 const menuButton = document.querySelector('.mobile-menu');
-const validPages = ['home', 'auth', 'dashboard', 'safe', 'sos', 'living', 'places', 'day', 'my'];
+const validPages = ['home', 'auth', 'dashboard', 'safe', 'living', 'places', 'day', 'my'];
 const safeGuideHash = "safe-guide";
 const safeCallHash = "safe-call";
 const safeRouteHash = "safe-route";
@@ -270,7 +269,6 @@ function render() {
     auth: renderAuth,
     dashboard: renderDashboard,
     safe: renderSafe,
-    sos: renderSOS,
     living: renderLiving,
     places: renderPlaces,
     day: renderDay,
@@ -783,7 +781,7 @@ function bindPageEvents() {
       if (preferences) {
         state.user.preferences = preferences.split(",").map((item) => item.trim()).filter(Boolean);
       }
-      showToast(state.authMode === "register" ? "Account created for this prototype" : "Logged in");
+      showToast(state.authMode === "register" ? t("authAccountCreatedToast") : t("authLoggedInToast"));
       navigate("dashboard");
     });
   });
@@ -1010,6 +1008,7 @@ function bindPageEvents() {
       state.lang = select.value;
       localStorage.setItem('herOwnLanguage', state.lang);
       render();
+      renderAssistant();
     });
   });
 
@@ -1165,6 +1164,12 @@ function bindPageEvents() {
     });
   });
 
+  app.querySelectorAll("[data-safe-action-scenario]").forEach((button) => {
+    button.addEventListener("click", () => {
+      openSafeScenario(button.dataset.safeActionScenario);
+    });
+  });
+
   app.querySelectorAll("[data-safe-action-tip]").forEach((button) => {
     button.addEventListener("click", () => {
       if (button.dataset.safeNumber) return;
@@ -1279,25 +1284,6 @@ function bindPageEvents() {
   app.querySelectorAll("[data-safety-call-emergency-phrases]").forEach((button) => {
     button.addEventListener("click", () => {
       openSafeModal(button.dataset.safetyCallEmergencyPhrases, t("safetyCallEmergencyPhrases"));
-    });
-  });
-
-  app.querySelectorAll("[data-sos]").forEach((button) => {
-    let holdTimer;
-    const reveal = () => {
-      state.sosRevealed = true;
-      showToast("SOS information revealed");
-      render();
-    };
-    button.addEventListener("pointerdown", () => {
-      button.classList.add("is-holding");
-      holdTimer = window.setTimeout(reveal, 900);
-    });
-    ["pointerup", "pointerleave", "pointercancel"].forEach((type) => {
-      button.addEventListener(type, () => {
-        window.clearTimeout(holdTimer);
-        button.classList.remove("is-holding");
-      });
     });
   });
 
@@ -1487,7 +1473,7 @@ function bindPageEvents() {
           state.favoritePlaces.push(place);
         }
         void saveFavoritePlace(state.user.id, id);
-        showToast("Saved to My Places");
+        showToast(t("placesSavedToast"));
       }
       render();
     });
@@ -1777,6 +1763,7 @@ export function initRouter() {
     state.lang = event.target.value;
     localStorage.setItem('herOwnLanguage', state.lang);
     render();
+    renderAssistant();
   });
 
   const initialHash = location.hash.replace('#', '');

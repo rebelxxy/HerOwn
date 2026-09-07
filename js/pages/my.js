@@ -1,6 +1,6 @@
 import { state, PICTURE_ROOT } from '../state.js';
 import { categoryIcons } from '../data.js';
-import { t } from '../i18n.js';
+import { labelFor, t } from '../i18n.js';
 import { pageShell, sectionHead } from '../components/layout.js';
 import { categoryButton, listRow } from '../components/cards.js';
 
@@ -263,7 +263,7 @@ export function renderMy() {
       </div>
       <div class="settings-readonly-row">
         <span>${t("myFavoritePlaceTypes")}</span>
-        <strong>${state.user.preferences.map((pref) => escapeHtml(pref)).join(", ")}</strong>
+        <strong>${state.user.preferences.map((pref) => escapeHtml(labelFor(pref))).join(", ")}</strong>
         <small>${t("myPrototypeReadOnly")}</small>
       </div>
       <div class="field">
@@ -310,7 +310,7 @@ export function renderMy() {
         <h2>${t("myTitle")}</h2>
         <p class="section-copy">${escapeHtml(state.user.city)} · ${currentLanguageLabel()}</p>
         <div class="guide-meta">
-          ${state.user.preferences.map((pref) => `<span class="tag">${escapeHtml(pref)}</span>`).join("")}
+          ${state.user.preferences.map((pref) => `<span class="tag">${escapeHtml(labelFor(pref))}</span>`).join("")}
         </div>
         <div class="my-menu">
           ${[

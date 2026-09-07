@@ -24,51 +24,6 @@
   color: var(--rose-deep);
 }
 
-.sos-layout {
-  display: grid;
-  grid-template-columns: 0.9fr 1.1fr;
-  gap: 18px;
-  align-items: start;
-}
-
-.sos-button {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: min(380px, 100%);
-  aspect-ratio: 1;
-  margin: 16px auto;
-  border: 0;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 28%, #fff7eb, rgba(216, 128, 120, 0.96) 52%, #9f5651 100%);
-  color: #fffaf4;
-  box-shadow: 0 30px 70px rgba(159, 86, 81, 0.28);
-  cursor: pointer;
-  font-weight: 900;
-  font-size: clamp(24px, 5vw, 42px);
-  text-align: center;
-  user-select: none;
-}
-
-.sos-button::after {
-  content: "";
-  position: absolute;
-  inset: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.54);
-  border-radius: 50%;
-}
-
-.sos-button.is-holding {
-  animation: pulse 900ms ease infinite;
-}
-
-@keyframes pulse {
-  50% {
-    transform: scale(1.025);
-  }
-}
-
 .map-panel {
   min-height: 380px;
   position: relative;
@@ -531,11 +486,36 @@
   color: #fffaf4;
 }
 
+.message.is-loading {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.assistant-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  margin-top: 10px;
+  border: 1px solid rgba(216, 128, 120, 0.36);
+  border-radius: 999px;
+  background: rgba(216, 128, 120, 0.12);
+  color: var(--rose-deep);
+  padding: 8px 11px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
 .assistant-prompts {
   display: flex;
   gap: 8px;
   padding: 0 16px 14px;
   overflow-x: auto;
+}
+
+.assistant-prompts[hidden] {
+  display: none;
 }
 
 .assistant-prompts button {
@@ -567,12 +547,38 @@
 }
 
 .assistant-form button {
-  border: 0;
+  border: 1px solid rgba(16, 43, 99, 0.12);
   border-radius: 50%;
-  background: var(--rose);
-  color: #fffaf4;
-  cursor: pointer;
+  background: rgba(16, 43, 99, 0.08);
+  color: rgba(16, 43, 99, 0.42);
+  cursor: default;
   font-weight: 900;
+  transition:
+    background 180ms ease-out,
+    border-color 180ms ease-out,
+    color 180ms ease-out,
+    transform 180ms ease-out,
+    box-shadow 180ms ease-out;
+}
+
+.assistant-form button.is-active {
+  border-color: var(--blue, #102b63);
+  background: var(--blue, #102b63);
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(16, 43, 99, 0.18);
+}
+
+.assistant-form button.is-active:hover {
+  transform: translateY(-1px);
+}
+
+.assistant-form button.is-sending {
+  border-color: rgba(16, 43, 99, 0.22);
+  background: rgba(16, 43, 99, 0.12);
+  color: var(--blue, #102b63);
+  cursor: wait;
+  box-shadow: none;
 }
 
 .phone-overlay {

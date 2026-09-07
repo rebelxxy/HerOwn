@@ -470,7 +470,7 @@ const safeScenarios = [
       { label: { en: "Check safely", ja: "安全に確認", zh: "安全确认" }, copy: { en: "Use the intercom or peephole without opening the door.", ja: "ドアを開けずにインターホンやのぞき穴で確認します。", zh: "不开门，用门铃对讲或猫眼确认。" }, behavior: "tip", tip: { en: "Keep the door locked. Ask who they are through the door or intercom.", ja: "鍵をかけたまま、ドア越しやインターホンで相手を確認してください。", zh: "保持门锁好，通过门或对讲询问对方是谁。" } },
       { label: { en: "Do not open the door", ja: "開けない", zh: "不要开门" }, copy: { en: "Keep the door locked until you know who is outside.", ja: "相手がわかるまで鍵を開けません。", zh: "确认身份前保持门锁好。" }, behavior: "tip", tip: { en: "You can stay silent or say you will confirm with management first.", ja: "黙っていても、管理会社に確認すると伝えても大丈夫です。", zh: "可以不回应，也可以说先联系管理公司确认。" } },
       { label: { en: "Contact building management", ja: "管理会社に連絡", zh: "联系物业或房东" }, copy: { en: "Ask the landlord, management company, or security staff for help.", ja: "大家、管理会社、警備スタッフに相談します。", zh: "联系房东、管理公司或安保人员。" }, behavior: "tip", tip: { en: "Contact your landlord, management company, or security desk before opening the door.", ja: "ドアを開ける前に、大家、管理会社、警備室へ連絡してください。", zh: "开门前先联系房东、管理公司或安保。" } },
-      { label: { en: "Emergency", ja: "緊急", zh: "紧急情况" }, copy: { en: "Call for help if you feel in immediate danger.", ja: "すぐ危険を感じる場合は助けを呼びます。", zh: "如果马上有危险，请求助。" }, behavior: "page", page: "sos" },
+      { label: { en: "Emergency", ja: "緊急", zh: "紧急情况" }, copy: { en: "Call for help if you feel in immediate danger.", ja: "すぐ危険を感じる場合は助けを呼びます。", zh: "如果马上有危险，请求助。" }, behavior: "scenario", scenario: "emergency" },
     ],
     phrases: [
       { ja: "どちら様ですか？", en: "Who is it?", zh: "请问是哪位？" },
@@ -515,7 +515,7 @@ const safeScenarios = [
       { label: { en: "Move away", ja: "離れる", zh: "离开" }, copy: { en: "Move near other passengers or to another carriage.", ja: "他の乗客の近くや別の車両へ移動します。", zh: "移动到其他乘客附近或换车厢。" }, behavior: "tip", tip: { en: "Move toward other passengers, the door, or another carriage when you can.", ja: "可能なら他の乗客、ドア付近、別の車両へ移動してください。", zh: "可以的话移动到其他乘客旁、车门附近或换车厢。" } },
       { label: { en: "Talk to station staff", ja: "駅員に相談", zh: "找站务员" }, copy: { en: "Ask station staff for help.", ja: "駅員に助けを求めます。", zh: "向站务员求助。" }, behavior: "tip", tip: { en: "Get off at the next safe station and tell station staff what happened.", ja: "安全な駅で降りて、駅員に状況を伝えてください。", zh: "在安全的车站下车，告诉站务员发生了什么。" } },
       { label: { en: "Communication", ja: "伝える", zh: "沟通" }, copy: { en: "Show or play helpful phrases.", ja: "必要な言葉を見せたり再生します。", zh: "展示或播放可用短句。" }, behavior: "communication" },
-      { label: { en: "Emergency", ja: "緊急", zh: "紧急情况" }, copy: { en: "Call for help if the situation becomes dangerous.", ja: "危険を感じる場合は助けを呼びます。", zh: "如果情况变危险，请求助。" }, behavior: "page", page: "sos" },
+      { label: { en: "Emergency", ja: "緊急", zh: "紧急情况" }, copy: { en: "Call for help if the situation becomes dangerous.", ja: "危険を感じる場合は助けを呼びます。", zh: "如果情况变危险，请求助。" }, behavior: "scenario", scenario: "emergency" },
     ],
     phrases: [
       { ja: "やめてください。", en: "Please stop.", zh: "请停止。" },
@@ -649,6 +649,7 @@ function renderAction(action, scenario) {
 
   const attrs = {
     page: action.behavior === "page" ? `data-safe-action-page="${action.page}"` : "",
+    scenario: action.behavior === "scenario" ? `data-safe-action-scenario="${escapeHtml(action.scenario)}"` : "",
     safetyCall: action.behavior === "safetyCall" ? `data-safety-call-open` : "",
     communication: action.behavior === "communication" ? `data-safe-scroll-communication` : "",
     home: action.behavior === "home" ? `data-safe-home` : "",
